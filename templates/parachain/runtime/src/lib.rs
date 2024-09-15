@@ -13,6 +13,8 @@ pub mod configs;
 mod genesis_config_presets;
 mod weights;
 
+pub use pallet_parachain_xcnft;
+
 extern crate alloc;
 use alloc::vec::Vec;
 use smallvec::smallvec;
@@ -21,7 +23,7 @@ use sp_runtime::{
 	traits::{BlakeTwo256, IdentifyAccount, Verify},
 	MultiSignature,
 };
-
+use sp_core::ConstU32;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
@@ -86,6 +88,7 @@ pub type SignedExtra = (
 	cumulus_primitives_storage_weight_reclaim::StorageWeightReclaim<Runtime>,
 	frame_metadata_hash_extension::CheckMetadataHash<Runtime>,
 );
+
 
 /// Unchecked extrinsic type as expected by this runtime.
 pub type UncheckedExtrinsic =
@@ -305,8 +308,10 @@ mod runtime {
 	#[runtime::pallet_index(33)]
 	pub type MessageQueue = pallet_message_queue;
 
-	// Template
 	#[runtime::pallet_index(50)]
+	pub type XnftModule = pallet_parachain_xcnft;
+	// Template
+	#[runtime::pallet_index(51)]
 	pub type TemplatePallet = pallet_parachain_template;
 }
 

@@ -31,6 +31,8 @@ serde_json = { workspace = true, default-features = false }
 
 # Local
 pallet-parachain-template = { workspace = true }
+pallet-parachain-xcnft = { workspace = true }
+
 
 # Substrate / FRAME
 frame-benchmarking = { optional = true, workspace = true }
@@ -116,6 +118,7 @@ std = [
 	"pallet-collator-selection/std",
 	"pallet-message-queue/std",
 	"pallet-parachain-template/std",
+	"pallet-parachain-xcnft/std",
 	"pallet-session/std",
 	"pallet-sudo/std",
 	"pallet-timestamp/std",
@@ -160,6 +163,7 @@ runtime-benchmarks = [
 	"pallet-collator-selection/runtime-benchmarks",
 	"pallet-message-queue/runtime-benchmarks",
 	"pallet-parachain-template/runtime-benchmarks",
+	"pallet-parachain-xcnft/runtime-benchmarks",
 	"pallet-sudo/runtime-benchmarks",
 	"pallet-timestamp/runtime-benchmarks",
 	"pallet-xcm/runtime-benchmarks",
@@ -186,6 +190,7 @@ try-runtime = [
 	"pallet-collator-selection/try-runtime",
 	"pallet-message-queue/try-runtime",
 	"pallet-parachain-template/try-runtime",
+	"pallet-parachain-xcnft/try-runtime",
 	"pallet-session/try-runtime",
 	"pallet-sudo/try-runtime",
 	"pallet-timestamp/try-runtime",
