@@ -537,6 +537,7 @@ members = [
 	"templates/minimal/runtime",
 	"templates/parachain/node",
 	"templates/parachain/pallets/template",
+	"templates/parachain/pallets/xcnft",
 	"templates/parachain/runtime",
 	"templates/solochain/node",
 	"templates/solochain/pallets/template",
@@ -957,6 +958,7 @@ pallet-offences = { path = "substrate/frame/offences", default-features = false 
 pallet-offences-benchmarking = { path = "substrate/frame/offences/benchmarking", default-features = false }
 pallet-paged-list = { path = "substrate/frame/paged-list", default-features = false }
 pallet-parachain-template = { path = "templates/parachain/pallets/template", default-features = false }
+pallet-parachain-xcnft = { path = "templates/parachain/pallets/xcnft", default-features = false }
 pallet-parameters = { path = "substrate/frame/parameters", default-features = false }
 pallet-preimage = { path = "substrate/frame/preimage", default-features = false }
 pallet-proxy = { path = "substrate/frame/proxy", default-features = false }

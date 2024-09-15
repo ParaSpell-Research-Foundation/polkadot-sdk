@@ -24,6 +24,7 @@
 // For more information, please refer to <http://unlicense.org>
 
 mod xcm_config;
+pub use pallet_parachain_xcnft;
 
 use polkadot_sdk::{staging_parachain_info as parachain_info, staging_xcm as xcm, *};
 #[cfg(not(feature = "runtime-benchmarks"))]
@@ -42,6 +43,7 @@ use frame_support::{
 	weights::{ConstantMultiplier, Weight},
 	PalletId,
 };
+
 use frame_system::{
 	limits::{BlockLength, BlockWeights},
 	EnsureRoot,
@@ -314,4 +316,17 @@ impl pallet_collator_selection::Config for Runtime {
 impl pallet_parachain_template::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_parachain_template::weights::SubstrateWeight<Runtime>;
+}
+
+impl pallet_parachain_xcnft::Config for Runtime {
+	type Currency = Balances;
+	type RuntimeEvent = RuntimeEvent;
+	type StringLimit = ConstU32<255>;
+	type JsonLimit = ConstU32<255>;
+	type CollectionLimit = ConstU32<255>;
+	type ParaIDLimit = ConstU32<9999>;
+	type CollectionsPerParachainLimit = ConstU32<9999>;
+	type NFTsPerParachainLimit = ConstU32<9999>;
+	type XcmSender = xcm_config::XcmRouter;
+	type RuntimeCall = RuntimeCall;
 }
