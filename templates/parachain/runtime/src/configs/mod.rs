@@ -25,6 +25,9 @@
 
 mod xcm_config;
 pub use pallet_parachain_xcnft;
+pub use pallet_uniques;
+
+use pallet_nfts::{AttributeNamespace, Call as NftsCall};
 
 use polkadot_sdk::{staging_parachain_info as parachain_info, staging_xcm as xcm, *};
 #[cfg(not(feature = "runtime-benchmarks"))]
@@ -48,6 +51,9 @@ use frame_system::{
 	limits::{BlockLength, BlockWeights},
 	EnsureRoot,
 };
+use sp_runtime::traits::{IdentifyAccount, IdentityLookup, Verify};
+
+use frame_system::EnsureSigned;
 use pallet_xcm::{EnsureXcm, IsVoiceOfBody};
 use parachains_common::message_queue::{NarrowOriginToSibling, ParaIdToSibling};
 use polkadot_runtime_common::{
@@ -55,6 +61,12 @@ use polkadot_runtime_common::{
 };
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_runtime::Perbill;
+use sp_runtime::{
+	create_runtime_str, generic, impl_opaque_keys,
+	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT},
+	transaction_validity::{TransactionSource, TransactionValidity},
+	ApplyExtrinsicResult, ExtrinsicInclusionMode, MultiSignature,
+};
 use sp_version::RuntimeVersion;
 use xcm::latest::prelude::BodyId;
 
@@ -319,14 +331,73 @@ impl pallet_parachain_template::Config for Runtime {
 }
 
 impl pallet_parachain_xcnft::Config for Runtime {
-	type Currency = Balances;
 	type RuntimeEvent = RuntimeEvent;
-	type StringLimit = ConstU32<255>;
-	type JsonLimit = ConstU32<255>;
-	type CollectionLimit = ConstU32<255>;
-	type ParaIDLimit = ConstU32<9999>;
-	type CollectionsPerParachainLimit = ConstU32<9999>;
-	type NFTsPerParachainLimit = ConstU32<9999>;
+	type WeightInfo = pallet_parachain_xcnft::weights::SubstrateWeight<Runtime>;
 	type XcmSender = xcm_config::XcmRouter;
 	type RuntimeCall = RuntimeCall;
+}
+pub const UNIT: Balance = 1;
+parameter_types! {
+	pub const CollectionDeposit: Balance = 1 * UNIT; // 1 UNIT deposit to create asset collection
+	pub const ItemDeposit: Balance = 1 * UNIT; // 1/100 UNIT deposit to create asset item
+	pub const KeyLimit: u32 = 32;	
+	pub const ValueLimit: u32 = 64;
+	pub const UniquesMetadataDepositBase: Balance = 1 * UNIT;
+	pub const AttributeDepositBase: Balance = 1 * UNIT;
+	pub const DepositPerByte: Balance = 1 * UNIT;
+	pub const UniquesStringLimit: u32 = 32;
+	pub const ApprovalsLimit: u32 = 1;
+	pub const ItemAttributesApprovalsLimit: u32 = 1;
+	pub const MaxTips: u32 = 1;
+	pub const MaxDeadlineDuration: u32 = 1;
+	pub const MaxAttributesPerCall: u32 = 10;
+	pub NftFeatures: pallet_nfts::PalletFeatures = pallet_nfts::PalletFeatures::all_enabled();
+
+}
+
+impl pallet_uniques::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type CollectionId = u128;
+	type ItemId = u128;
+	type Currency = Balances;
+	type ForceOrigin = EnsureRoot<AccountId>;
+	type CreateOrigin = EnsureSigned<AccountId>;
+	type Locker = ();
+	type CollectionDeposit = CollectionDeposit;
+	type ItemDeposit = ItemDeposit;
+	type MetadataDepositBase = UniquesMetadataDepositBase;
+	type AttributeDepositBase = AttributeDepositBase;
+	type DepositPerByte = DepositPerByte;
+	type StringLimit = UniquesStringLimit;
+	type KeyLimit = KeyLimit;
+	type ValueLimit = ValueLimit;
+	type WeightInfo = ();
+}
+pub type AccountPublic = <MultiSignature as Verify>::Signer;
+
+impl pallet_nfts::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type CollectionId = u128;
+	type ItemId = Hash;
+	type Currency = Balances;
+	type ForceOrigin = EnsureRoot<AccountId>;
+	type CreateOrigin = EnsureSigned<AccountId>;
+	type CollectionDeposit = CollectionDeposit;
+	type Locker = ();
+	type ItemDeposit = ItemDeposit;
+	type MetadataDepositBase = UniquesMetadataDepositBase;
+	type AttributeDepositBase = AttributeDepositBase;
+	type DepositPerByte = DepositPerByte;
+	type StringLimit = UniquesStringLimit;
+	type KeyLimit = KeyLimit;
+	type ValueLimit = ValueLimit;
+	type ApprovalsLimit = ApprovalsLimit;
+	type ItemAttributesApprovalsLimit = ItemAttributesApprovalsLimit;
+	type MaxTips = MaxTips;
+	type MaxDeadlineDuration = MaxDeadlineDuration;
+	type MaxAttributesPerCall = MaxAttributesPerCall;
+	type Features = NftFeatures;
+	type OffchainSignature = MultiSignature;
+	type OffchainPublic = AccountPublic;
+	type WeightInfo = ();
 }
