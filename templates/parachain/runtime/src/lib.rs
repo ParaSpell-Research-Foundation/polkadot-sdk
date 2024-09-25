@@ -309,10 +309,17 @@ mod runtime {
 	pub type MessageQueue = pallet_message_queue;
 
 	#[runtime::pallet_index(50)]
-	pub type XnftModule = pallet_parachain_xcnft;
-	// Template
+	pub type XcnftModule = pallet_parachain_xcnft;
+
 	#[runtime::pallet_index(51)]
 	pub type TemplatePallet = pallet_parachain_template;
+
+	#[runtime::pallet_index(52)]
+	pub type UniquesModule = pallet_uniques;
+
+	#[runtime::pallet_index(53)]
+	pub type NftModule = pallet_nfts;
+
 }
 
 #[docify::export(register_validate_block)]
