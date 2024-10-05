@@ -30,8 +30,12 @@ xcm = { workspace = true}
 cumulus-primitives-core = { workspace = true }
 cumulus-pallet-xcm = { workspace = true }
 
+
 sp-runtime = { workspace = true }
 sp-std = {workspace = true}
+
+pallet-uniques = { workspace = true, default-features = false }
+pallet-nfts = {workspace=true, default-features = false}
 
 [dev-dependencies]
 serde = { version = "1.0.210", default-features = false }
@@ -41,7 +45,6 @@ sp-core = { workspace = true, default-features = true }
 sp-io = { workspace = true, default-features = true }
 
 pallet-balances = { workspace = true, default-features = true }
-
 
 [features]
 default = [ "std" ]
@@ -55,11 +58,11 @@ runtime-benchmarks = [
 std = [
 	"codec/std",
 	"scale-info/std",
-
+	"pallet-uniques/std",
 	"frame-benchmarking?/std",
 	"frame-support/std",
 	"frame-system/std",
-
+	"pallet-nfts/std",
 	"sp-runtime/std",
 	"cumulus-pallet-xcm/std",
 	"cumulus-primitives-core/std",

@@ -335,6 +335,9 @@ impl pallet_parachain_xcnft::Config for Runtime {
 	type WeightInfo = pallet_parachain_xcnft::weights::SubstrateWeight<Runtime>;
 	type XcmSender = xcm_config::XcmRouter;
 	type RuntimeCall = RuntimeCall;
+	type ProposalTimeInBlocks = proposal_time_in_blocks_parameter;
+	type MaxOwners = max_owners_parameter;
+	type MaxVotes = max_votes;
 }
 pub const UNIT: Balance = 1;
 parameter_types! {
@@ -352,7 +355,9 @@ parameter_types! {
 	pub const MaxDeadlineDuration: u32 = 1;
 	pub const MaxAttributesPerCall: u32 = 10;
 	pub NftFeatures: pallet_nfts::PalletFeatures = pallet_nfts::PalletFeatures::all_enabled();
-
+	pub const proposal_time_in_blocks_parameter: u32 = 200000;
+	pub const max_owners_parameter: u32 = 1000000;
+	pub const max_votes: u32 = 1000000;
 }
 
 impl pallet_uniques::Config for Runtime {
@@ -377,8 +382,8 @@ pub type AccountPublic = <MultiSignature as Verify>::Signer;
 
 impl pallet_nfts::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type CollectionId = u128;
-	type ItemId = Hash;
+	type CollectionId = u32;
+	type ItemId = u32;
 	type Currency = Balances;
 	type ForceOrigin = EnsureRoot<AccountId>;
 	type CreateOrigin = EnsureSigned<AccountId>;
