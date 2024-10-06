@@ -337,7 +337,6 @@ impl pallet_parachain_xcnft::Config for Runtime {
 	type RuntimeCall = RuntimeCall;
 	type ProposalTimeInBlocks = proposal_time_in_blocks_parameter;
 	type MaxOwners = max_owners_parameter;
-	type MaxVotes = max_votes;
 }
 pub const UNIT: Balance = 1;
 parameter_types! {
@@ -355,7 +354,7 @@ parameter_types! {
 	pub const MaxDeadlineDuration: u32 = 1;
 	pub const MaxAttributesPerCall: u32 = 10;
 	pub NftFeatures: pallet_nfts::PalletFeatures = pallet_nfts::PalletFeatures::all_enabled();
-	pub const proposal_time_in_blocks_parameter: u32 = 200000;
+	pub const proposal_time_in_blocks_parameter: u32 = 100;
 	pub const max_owners_parameter: u32 = 1000000;
 	pub const max_votes: u32 = 1000000;
 }

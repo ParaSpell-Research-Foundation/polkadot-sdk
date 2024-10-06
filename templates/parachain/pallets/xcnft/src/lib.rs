@@ -72,15 +72,14 @@ pub mod pallet {
 
 	use frame_system::pallet_prelude::*;
 	use sp_runtime::traits::{CheckedAdd, One};
-	use frame_support::{dispatch::DispatchResultWithPostInfo, pallet_prelude::*, DefaultNoBound, sp_runtime::traits::Hash, 
-		traits::{Currency, LockableCurrency, ReservableCurrency}};
+	use frame_support::{dispatch::DispatchResultWithPostInfo, pallet_prelude::*, sp_runtime::traits::Hash, traits::{Currency, LockableCurrency, ReservableCurrency}, DefaultNoBound};
 	use frame_support::traits::PalletInfo;
 	use codec::Encode;
 	use cumulus_primitives_core::{ParaId};
 	use scale_info::prelude::vec;
 	use sp_std::prelude::*;
 	use xcm::latest::prelude::*;
-	use pallet_nfts::{AttributeNamespace, Call as NftsCall, ItemDetails};
+	use pallet_nfts::{AttributeNamespace, Call as NftsCall, ItemDetails, ItemMetadata, CollectionDetails};
 	use core::marker::PhantomData;
 	
 	pub type BalanceOf<T, I = ()> =
@@ -92,6 +91,7 @@ pub mod pallet {
 	BalanceOf<T, I>, BlockNumberFor<T>,
 	<T as pallet_nfts::Config<I>>::CollectionId,
 	>;
+
 
 	pub type ParachainID = ParaId; 
 
@@ -117,8 +117,6 @@ pub mod pallet {
 		/// Specifies how much different owners can be in a collection - used in voting process
 		type MaxOwners: Get<u32>;
 
-		/// Max amount of aye and nay
-		type MaxVotes: Get<u32>;
 	}
 
 	#[pallet::pallet]
@@ -148,6 +146,9 @@ pub mod pallet {
 	pub struct Proposal<T: Config<I>, I: 'static = ()> {
 		proposal_id: u64,
 		collection_id: T::CollectionId,
+		proposed_collection_owner: T::AccountId,
+		proposed_destination_para: ParachainID,
+		proposed_destination_config: CollectionConfigFor<T, I>,
 		owners: BoundedVec<T::AccountId, T::MaxOwners>,
 		number_of_votes: Votes<T,I>,
 		end_time: BlockNumberFor<T>,
@@ -232,14 +233,16 @@ pub mod pallet {
 			destination: ParaId,
 		},
 
-		/// Event emitted when cross-chain transfer fails
+		/// Event emitted when there are different NFT owners in the collection
 		CollectionTransferProposalCreated {
 			proposal_id: u64,
 			collection_id: T::CollectionId,
-			owner: T::AccountId,
+			proposer: T::AccountId,
+			proposed_collection_owner: AccountIdLookupOf<T>,
 			destination: ParaId,
 		},
 
+		/// Event emitted when a collection and its NFTs are transferred cross-chain
 		CollectionAndNFTsTransferred {
 			origin_collection_id: T::CollectionId,
 			nft_ids: Vec<T::ItemId>,
@@ -247,16 +250,12 @@ pub mod pallet {
 			to_address: AccountIdLookupOf<T>,
 		},
 
+		/// Event emitted when a vote is registered
 		CrossChainPropoposalVoteRegistered{
 			proposal_id: u64,
 			voter: T::AccountId,
 			vote: Vote,
 		},
-
-		TestEvent{
-			proposal: T::CollectionId,
-			collection: T::CollectionId,
-		}
 	}
 
 	/// <https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html#event-and-error>
@@ -267,6 +266,9 @@ pub mod pallet {
 		ProposalAlreadyExists,
 		NotCollectionOwner,
 		ProposalExpired,
+		ProposalStillActive,
+		ProposalDoesNotExist,
+		ProposalDidNotPass,
 		AlreadyVotedThis,
 		MaxOwnersReached,
 		NotNFTOwner,
@@ -275,10 +277,7 @@ pub mod pallet {
 	//#[pallet::hooks]
 	//impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
 
-	/// Dispatchable functions allows users to interact with the pallet and invoke state changes.
-	/// These functions materialize as "extrinsics", which are often compared to transactions.
-	/// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
-	/// <https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html#dispatchables>
+
 	#[pallet::call]
 	impl<T: Config<I>, I: 'static> Pallet<T, I> {
 
@@ -331,6 +330,17 @@ pub mod pallet {
 					Ok((_hash, _cost)) => {
 						//Burning the collection
 						pallet_nfts::Collection::<T, I>::remove(&origin_collection);
+
+						pallet_nfts::CollectionMetadataOf::<T, I>::remove(&origin_collection);
+
+						pallet_nfts::CollectionConfigOf::<T, I>::remove(&origin_collection);
+
+						pallet_nfts::CollectionRoleOf::<T, I>::remove(&origin_collection, who.clone());
+
+						pallet_nfts::CollectionAccount::<T, I>::remove(who.clone(), &origin_collection);
+												
+						// Unreserve the funds
+						T::Currency::unreserve(&who.clone(), <T as pallet_nfts::Config<I>>::CollectionDeposit::get());
 
 						// Emit an event.
 						Self::deposit_event(Event::CollectionTransferred {
@@ -398,6 +408,9 @@ pub mod pallet {
 							let proposal = Proposal::<T, I> {
 								proposal_id: proposal_id,
 								collection_id: origin_collection,
+								proposed_collection_owner: T::Lookup::lookup(destination_account.clone())?, //Converting back to AccountId, if the proposal gets accepted, then converting it back to AccountIdLookup
+								proposed_destination_config: config,
+								proposed_destination_para: destination_para,
 								owners: different_owners,
 								number_of_votes: Votes {
 									aye: BoundedVec::new(),
@@ -411,9 +424,12 @@ pub mod pallet {
 							Self::deposit_event(Event::CollectionTransferProposalCreated {
 								proposal_id: proposal_id,
 								collection_id: origin_collection,
-								owner: who.clone(),
+								proposer: who.clone(),
+								proposed_collection_owner: destination_account.clone(),
 								destination: destination_para,							
 							});
+
+							return Ok(().into());
 						} 
 					}
 				}
@@ -462,6 +478,17 @@ pub mod pallet {
 						//Burning the collection
 						pallet_nfts::Collection::<T, I>::remove(&origin_collection);
 
+						pallet_nfts::CollectionMetadataOf::<T, I>::remove(&origin_collection);
+
+						pallet_nfts::CollectionConfigOf::<T, I>::remove(&origin_collection);
+
+						pallet_nfts::CollectionRoleOf::<T, I>::remove(&origin_collection, who.clone());
+
+						pallet_nfts::CollectionAccount::<T, I>::remove(who.clone(), &origin_collection);
+
+						// Unreserve the funds
+						T::Currency::unreserve(&who.clone(), <T as pallet_nfts::Config<I>>::CollectionDeposit::get());
+
 						// Emit an event.
 						Self::deposit_event(Event::CollectionAndNFTsTransferred {
 							origin_collection_id: origin_collection,
@@ -482,15 +509,14 @@ pub mod pallet {
 			Ok(().into())
 		}
 
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
+
 		#[pallet::call_index(1)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn collectionXtransferVote(origin: OriginFor<T>, proposal_id: u64, actual_vote: Vote) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
 			let proposal = CrossChainProposals::<T, I>::get(proposal_id);
-			ensure!(proposal.is_some(), Error::<T, I>::ProposalAlreadyExists); // Check before unwrapping
+			ensure!(proposal.is_some(), Error::<T, I>::ProposalDoesNotExist); // Check before unwrapping
 		
 			// Safely unwrap the proposal once
 			let mut unwrapped_proposal = proposal.unwrap();
@@ -505,8 +531,7 @@ pub mod pallet {
 				// If proposal did not pass (Less than 50% of votes are aye)
 				// Remove proposal from proposals to free up storage space
 				let number_of_votes = &unwrapped_proposal.number_of_votes.aye.len() + &unwrapped_proposal.number_of_votes.nay.len();
-				if unwrapped_proposal.number_of_votes.aye.len() < number_of_votes / 2 {
-					CrossChainProposals::<T, I>::remove(proposal_id);
+				if (unwrapped_proposal.number_of_votes.aye.len() < number_of_votes / 2 || unwrapped_proposal.number_of_votes.aye.len() == 0 && unwrapped_proposal.number_of_votes.nay.len() == 0) {
 					return Err(Error::<T, I>::ProposalExpired.into());
 				}
 				return Err(Error::<T, I>::ProposalExpired.into());
@@ -547,9 +572,164 @@ pub mod pallet {
 				voter: who.clone(),
 				vote: actual_vote,
 			});
+
+			//Convert accountid to accountidlookup
+
 			
 			Ok(().into())
 		}
+
+		#[pallet::call_index(2)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn collectionXtransferInitiate(origin: OriginFor<T>, proposal_id: u64) -> DispatchResultWithPostInfo{
+			let who = ensure_signed(origin.clone())?;
+		
+			let proposal = CrossChainProposals::<T, I>::get(proposal_id);
+			
+			// Check if proposal exists
+			ensure!(proposal.is_some(), Error::<T, I>::ProposalDoesNotExist);
+			//Check if owner of the collection is the one who initiated the transfer
+		
+			let proposal = proposal.as_ref().unwrap(); // Borrow the proposal
+				
+			let owner = pallet_nfts::Pallet::<T,I>::collection_owner(proposal.collection_id.clone()).ok_or(Error::<T, I>::CollectionDoesNotExist)?;
+			ensure!(owner == who.clone(), Error::<T, I>::NotCollectionOwner);
+
+			// Check if the proposal is active or not
+			let block_n: BlockNumberFor<T> = frame_system::Pallet::<T>::block_number();
+			if block_n < proposal.end_time {
+				return Err(Error::<T, I>::ProposalStillActive.into());
+			}
+
+			// Check if the proposal passed
+			let number_of_votes = proposal.number_of_votes.aye.len() + proposal.number_of_votes.nay.len();
+			if (proposal.number_of_votes.aye.len() < number_of_votes / 2 || proposal.number_of_votes.aye.len() == 0 && proposal.number_of_votes.nay.len() == 0) {
+				// If proposal did not pass (Less than 50% of votes are aye)
+				return Err(Error::<T, I>::ProposalDidNotPass.into());
+			}
+			else if proposal.number_of_votes.aye.len() >= number_of_votes / 2 {
+				// Transfer the collection to the destination parachain
+				// (Implementation for transfer goes here)
+
+				//Get the collection metadata
+				let mut collection_metadata;
+				if pallet_nfts::CollectionMetadataOf::<T, I>::contains_key(proposal.collection_id.clone()){
+					collection_metadata = pallet_nfts::CollectionMetadataOf::<T, I>::get(proposal.collection_id.clone()).unwrap();
+				}
+				//Get NFT metadata
+				let mut nft_metadata = Vec::new();
+				
+				// Iterate through all items in the collection to get item ids
+				let mut items = Vec::new();
+
+				for (item_id, _item_details) in pallet_nfts::Item::<T, I>::iter_prefix(proposal.collection_id.clone()) {
+					// Process or collect the item details
+					// item_id is the ItemId, and item_details contains the item's details
+					//Store items in an array
+					items.push(item_id);
+				}
+
+				if items.is_empty() {
+					//If we have no items meanwhile we might as well just transfer the collection through regular function
+					//remove proposal
+					CrossChainProposals::<T, I>::remove(proposal_id);
+					Self::collectionXtransfer(origin, proposal.collection_id, proposal.proposed_destination_para, T::Lookup::unlookup(proposal.proposed_collection_owner.clone()), proposal.proposed_destination_config.clone())?;
+				}
+
+				for item_id in items.clone() {
+					if pallet_nfts::ItemMetadataOf::<T, I>::contains_key(proposal.collection_id.clone(), item_id) {
+						if let Some(nft_owner) = pallet_nfts::Pallet::<T, I>::owner(proposal.collection_id, item_id) {
+							let item_details = pallet_nfts::ItemMetadataOf::<T, I>::get(proposal.collection_id.clone(), item_id).unwrap();
+							let unlookup_owner = T::Lookup::unlookup(nft_owner.clone());
+							nft_metadata.push((item_id, unlookup_owner.clone(), item_details));
+						}
+					}
+				}
+
+				let destination = proposal.proposed_destination_para.clone();
+				let recipient = proposal.proposed_collection_owner.clone();
+				let unlooked_recipient = T::Lookup::unlookup(recipient.clone());
+				let config = proposal.proposed_destination_config.clone();
+
+				//Send xcm, if successful, burn the collection and NFTs
+				match send_xcm::<T::XcmSender>(
+					(Parent, Junction::Parachain(destination.into())).into(),
+					Xcm(vec![
+						UnpaidExecution { weight_limit: Unlimited, check_origin: None },
+						Transact {
+							origin_kind: OriginKind::SovereignAccount,
+							require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
+							call: <T as Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
+								T,
+								I,
+							>::create {
+								admin: unlooked_recipient.clone(),
+								config,
+							})
+							.encode()
+							.into(),
+						},
+					]),
+				) {
+					Ok((_hash, _cost)) => {
+						//Burning the NFTs
+						for item_id in items.clone() {
+
+							// Remove the NFT item from storage
+							pallet_nfts::Item::<T, I>::remove(proposal.collection_id.clone(), item_id);
+
+							// Remove associated metadata
+							pallet_nfts::ItemMetadataOf::<T, I>::remove(proposal.collection_id.clone(), item_id);
+							
+							// Remove associated attributes
+							pallet_nfts::ItemAttributesApprovalsOf::<T, I>::remove(proposal.collection_id.clone(), item_id);
+							
+							// Clear ownership records
+							pallet_nfts::ItemPriceOf::<T, I>::remove(proposal.collection_id.clone(), item_id);
+							
+							// Remove any pending approvals
+							pallet_nfts::ItemConfigOf::<T, I>::remove(proposal.collection_id.clone(), item_id);
+
+						}
+
+						//Burning the collection
+						//Retrieve the collection details
+
+						pallet_nfts::Collection::<T, I>::remove(proposal.collection_id.clone());
+
+						pallet_nfts::CollectionMetadataOf::<T, I>::remove(proposal.collection_id.clone());
+
+						pallet_nfts::CollectionConfigOf::<T, I>::remove(proposal.collection_id.clone());
+
+						pallet_nfts::CollectionRoleOf::<T, I>::remove(proposal.collection_id.clone(), who.clone());
+
+						pallet_nfts::CollectionAccount::<T, I>::remove(who.clone(), proposal.collection_id.clone());
+		
+						// Unreserve the funds
+						T::Currency::unreserve(&who.clone(), <T as pallet_nfts::Config<I>>::CollectionDeposit::get());
+
+						// Remove proposal from proposals to free up storage space
+						CrossChainProposals::<T, I>::remove(proposal_id);
+
+						// Emit an event.
+						Self::deposit_event(Event::CollectionAndNFTsTransferred {
+							origin_collection_id: proposal.collection_id.clone(),
+							nft_ids: items.clone(),
+							destination_para_id: proposal.proposed_destination_para.clone(),
+							to_address: unlooked_recipient.clone(),
+						});
+					},
+					Err(e) => Self::deposit_event(Event::CollectionFailedToXCM {
+						e,
+						collection_id: proposal.collection_id.clone(),
+						owner: who.clone(),
+						destination: proposal.proposed_destination_para.clone(),
+					}),
+				}
+			}
+		
+			Ok(().into())
+		}		
 
 	}
 }
