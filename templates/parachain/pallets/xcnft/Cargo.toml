@@ -29,6 +29,7 @@ xcm = { workspace = true}
 
 cumulus-primitives-core = { workspace = true }
 cumulus-pallet-xcm = { workspace = true }
+parachain-info = { workspace = true }
 
 
 sp-runtime = { workspace = true }
@@ -53,7 +54,6 @@ runtime-benchmarks = [
 	"frame-support/runtime-benchmarks",
 	"frame-system/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
-
 ]
 std = [
 	"codec/std",
@@ -71,10 +71,12 @@ std = [
 	"sp-core/std",
 	"sp-io/std",
 	"sp-runtime/std",
+	"parachain-info/std",
 ]
 try-runtime = [
 	"cumulus-pallet-xcm/try-runtime",
 	"frame-support/try-runtime",
 	"frame-system/try-runtime",
 	"sp-runtime/try-runtime",
+	"parachain-info/try-runtime",
 ]

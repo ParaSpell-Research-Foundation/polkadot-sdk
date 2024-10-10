@@ -12,7 +12,7 @@
 //! - Transferring empty collection cross-chain: **collectionXtransfer**  
 //! - Transferring non-empty collection cross-chain (All NFTs are owned by collection owner): **collectionXtransfer**  
 //! - Transfering non-empty collection cross-chain (NFTs are distributed between different accounts): **collectionXtransfer** & **collectionXtransferVote** & **collectionXtransferInitiate**
-//! - Transfering non-fungible assets cross-chain: **nftXtransfer**
+//! - Transfering non-fungible assets cross-chain: **nftXtransfer** & **nftXclaim**
 //! - Updating collection metadata cross-chain: **collectionXupdate**
 //! - Updating non-fungible asset metadata cross-chain: **nftXupdate**
 //! - Burning collection cross-chain: **collectionXburn**
@@ -97,7 +97,7 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config<I: 'static = ()>: frame_system::Config + pallet_nfts::Config<I> {
+	pub trait Config<I: 'static = ()>: frame_system::Config + pallet_nfts::Config<I> + parachain_info::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
         type RuntimeEvent: From<Event<Self, I>>
             + IsType<<Self as frame_system::Config>::RuntimeEvent>;
@@ -178,12 +178,22 @@ pub mod pallet {
 		received_asset_id: T::ItemId,
 	}
 
+	#[derive(
+		Encode, Decode, MaxEncodedLen, TypeInfo, Clone, PartialEq, Default,
+	)]
+	#[scale_info(skip_type_params(T, I))]
+	pub struct ReceivedCols<T: Config<I>, I: 'static = ()> {
+		origin_para_id: ParachainID,
+		origin_collection_id: T::CollectionId,
+		received_collection_id: T::CollectionId,
+	}
+
 	#[pallet::storage]
 	#[pallet::getter(fn sent_assets)]
 	pub type SentAssets<T: Config<I>, I: 'static = ()> = StorageMap<
     _,
     Blake2_128Concat,
-    (T::CollectionId, T::ItemId),  // Tuple (origin_collection_id, origin_asset_id, pallet_type)
+    (T::CollectionId, T::ItemId),  // Tuple (origin_collection_id, origin_asset_id)
     SentStruct<T, I>,       // Sent assets structure
 	>;
 
@@ -192,8 +202,17 @@ pub mod pallet {
 	pub type ReceivedAssets<T: Config<I>, I: 'static = ()> = StorageMap<
     _,
     Blake2_128Concat,
-    (T::CollectionId, T::ItemId),  // Tuple (received_collection_id, received_asset_id, pallet_type)
+    (T::CollectionId, T::ItemId),  // Tuple (received_collection_id, received_asset_id)
     ReceivedStruct<T, I>,   // Received assets structure
+	>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn received_collections)]
+	pub type ReceivedCollections<T: Config<I>, I: 'static = ()> = StorageMap<
+    _,
+    Blake2_128Concat,
+    T::CollectionId, 
+    ReceivedCols<T, I>,   // Received assets structure
 	>;
 
 	//Next proposal id
@@ -256,6 +275,23 @@ pub mod pallet {
 			voter: T::AccountId,
 			vote: Vote,
 		},
+
+		/// Event emitted when non-fungible asset is transferred cross-chain
+		NFTTransferred {
+			origin_collection_id: T::CollectionId,
+			origin_asset_id: T::ItemId,
+			destination_para_id: ParachainID,
+			destination_collection_id: T::CollectionId,
+			destination_asset_id: T::ItemId,
+			to_address: AccountIdLookupOf<T>,
+		},
+
+		NFTClaimed {
+			collection_claimed_from: T::CollectionId,
+			asset_removed: T::ItemId,
+			collection_claimed_to: T::CollectionId,
+			asset_claimed: T::ItemId,
+		}
 	}
 
 	/// <https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html#event-and-error>
@@ -263,6 +299,7 @@ pub mod pallet {
 	pub enum Error<T, I = ()> {
 		/// Error names should be descriptive.
 		CollectionDoesNotExist,
+		NFTDoesNotExist,
 		ProposalAlreadyExists,
 		NotCollectionOwner,
 		ProposalExpired,
@@ -272,6 +309,7 @@ pub mod pallet {
 		AlreadyVotedThis,
 		MaxOwnersReached,
 		NotNFTOwner,
+		NFTNotReceived,
 	}
 
 	//#[pallet::hooks]
@@ -328,7 +366,16 @@ pub mod pallet {
 					]),
 				) {
 					Ok((_hash, _cost)) => {
+						//If collection was received, remove from received collections
+						if ReceivedCollections::<T, I>::contains_key(&origin_collection) {
+							ReceivedCollections::<T, I>::remove(&origin_collection);
+						}
+
 						//Burning the collection
+						if let Some(col_deposit) = pallet_nfts::Pallet::<T, I>::deposit(origin_collection) {
+							T::Currency::unreserve(&who.clone(), col_deposit);
+						}
+
 						pallet_nfts::Collection::<T, I>::remove(&origin_collection);
 
 						pallet_nfts::CollectionMetadataOf::<T, I>::remove(&origin_collection);
@@ -339,9 +386,6 @@ pub mod pallet {
 
 						pallet_nfts::CollectionAccount::<T, I>::remove(who.clone(), &origin_collection);
 												
-						// Unreserve the funds
-						T::Currency::unreserve(&who.clone(), <T as pallet_nfts::Config<I>>::CollectionDeposit::get());
-
 						// Emit an event.
 						Self::deposit_event(Event::CollectionTransferred {
 							origin_collection_id: origin_collection,
@@ -471,11 +515,20 @@ pub mod pallet {
 					]),
 				) {
 					Ok((_hash, _cost)) => {
+						//If collection was received, remove from received collections
+						if ReceivedCollections::<T, I>::contains_key(&origin_collection) {
+							ReceivedCollections::<T, I>::remove(&origin_collection);
+						}
+
 						//Burning the NFTs
 						for item_id in items.clone() {
 							pallet_nfts::Pallet::<T, I>::burn(origin.clone(), origin_collection.clone(), item_id);
 						}
 						//Burning the collection
+						if let Some(col_deposit) = pallet_nfts::Pallet::<T, I>::deposit(origin_collection) {
+							T::Currency::unreserve(&who.clone(), col_deposit);
+						}
+
 						pallet_nfts::Collection::<T, I>::remove(&origin_collection);
 
 						pallet_nfts::CollectionMetadataOf::<T, I>::remove(&origin_collection);
@@ -485,9 +538,6 @@ pub mod pallet {
 						pallet_nfts::CollectionRoleOf::<T, I>::remove(&origin_collection, who.clone());
 
 						pallet_nfts::CollectionAccount::<T, I>::remove(who.clone(), &origin_collection);
-
-						// Unreserve the funds
-						T::Currency::unreserve(&who.clone(), <T as pallet_nfts::Config<I>>::CollectionDeposit::get());
 
 						// Emit an event.
 						Self::deposit_event(Event::CollectionAndNFTsTransferred {
@@ -672,11 +722,31 @@ pub mod pallet {
 					]),
 				) {
 					Ok((_hash, _cost)) => {
+						//If collection was received, remove from received collections
+						if ReceivedCollections::<T, I>::contains_key(proposal.collection_id.clone()) {
+							ReceivedCollections::<T, I>::remove(proposal.collection_id.clone());
+						}
+
 						//Burning the NFTs
 						for item_id in items.clone() {
 
+							//Unreserve the funds of person who created NFT
+							if let Some(depositor_account) = pallet_nfts::Pallet::<T, I>::item_depositor(proposal.collection_id.clone(), item_id) {
+								if let Some(deposit_amount) = pallet_nfts::Pallet::<T, I>::item_deposit(proposal.collection_id.clone(), item_id) {
+									T::Currency::unreserve(&depositor_account, deposit_amount);
+								} 
+							}
+
+							//Remove nft from associated account
+							//Get NFT owner
+							let nft_owner = pallet_nfts::Pallet::<T, I>::owner(proposal.collection_id.clone(), item_id).unwrap();
+							pallet_nfts::Account::<T, I>::remove((nft_owner.clone(), proposal.collection_id.clone(), item_id));
+
 							// Remove the NFT item from storage
 							pallet_nfts::Item::<T, I>::remove(proposal.collection_id.clone(), item_id);
+
+							//Remove nft from pending swaps
+							pallet_nfts::PendingSwapOf::<T, I>::remove(proposal.collection_id.clone(), item_id);
 
 							// Remove associated metadata
 							pallet_nfts::ItemMetadataOf::<T, I>::remove(proposal.collection_id.clone(), item_id);
@@ -689,11 +759,16 @@ pub mod pallet {
 							
 							// Remove any pending approvals
 							pallet_nfts::ItemConfigOf::<T, I>::remove(proposal.collection_id.clone(), item_id);
-
+							
 						}
 
 						//Burning the collection
 						//Retrieve the collection details
+		
+						// Unreserve the funds
+						if let Some(col_deposit) = pallet_nfts::Pallet::<T, I>::deposit(proposal.collection_id.clone()) {
+							T::Currency::unreserve(&who.clone(), col_deposit);
+						}
 
 						pallet_nfts::Collection::<T, I>::remove(proposal.collection_id.clone());
 
@@ -704,12 +779,12 @@ pub mod pallet {
 						pallet_nfts::CollectionRoleOf::<T, I>::remove(proposal.collection_id.clone(), who.clone());
 
 						pallet_nfts::CollectionAccount::<T, I>::remove(who.clone(), proposal.collection_id.clone());
-		
-						// Unreserve the funds
-						T::Currency::unreserve(&who.clone(), <T as pallet_nfts::Config<I>>::CollectionDeposit::get());
 
 						// Remove proposal from proposals to free up storage space
 						CrossChainProposals::<T, I>::remove(proposal_id);
+
+						//TODO Add shortened version of proposal to the list of completed proposals so users can track where their NFTs went
+
 
 						// Emit an event.
 						Self::deposit_event(Event::CollectionAndNFTsTransferred {
@@ -731,5 +806,173 @@ pub mod pallet {
 			Ok(().into())
 		}		
 
+		#[pallet::call_index(3)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn nftXtransfer(origin: OriginFor<T>, origin_collection: T::CollectionId, origin_asset: T::ItemId, destination_para: ParaId, destination_account: AccountIdLookupOf<T>, destination_collection: T::CollectionId, destination_asset: T::ItemId ) -> DispatchResultWithPostInfo {
+			let who = ensure_signed(origin.clone())?;
+
+			//See if collection exists
+			let collection_exists = pallet_nfts::Collection::<T, I>::contains_key(&origin_collection);
+			ensure!(collection_exists, Error::<T, I>::CollectionDoesNotExist);
+
+			//See if item exists
+			let item_exists = pallet_nfts::Item::<T, I>::contains_key(&origin_collection, &origin_asset);
+			ensure!(item_exists, Error::<T, I>::NFTDoesNotExist);
+
+			//See if user owns the item
+			let owner = pallet_nfts::Pallet::<T,I>::owner(origin_collection.clone(), origin_asset.clone()).ok_or(Error::<T, I>::NFTDoesNotExist)?;
+			ensure!(owner == who.clone(), Error::<T, I>::NotNFTOwner);
+
+			let mut metadata = None;
+			//Get Item data
+			if pallet_nfts::ItemMetadataOf::<T, I>::contains_key(&origin_collection, &origin_asset) {
+				metadata = pallet_nfts::ItemMetadataOf::<T, I>::get(&origin_collection, &origin_asset);
+			}
+
+
+			//Send the asset cross-chain
+
+			match send_xcm::<T::XcmSender>(
+				(Parent, Junction::Parachain(destination_para.into())).into(),
+				Xcm(vec![
+					UnpaidExecution { weight_limit: Unlimited, check_origin: None },
+					Transact {
+						origin_kind: OriginKind::SovereignAccount,
+						require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
+						call: <T as Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
+							T,
+							I,
+						>::mint {
+							collection: destination_collection.clone(),
+							item: destination_asset.clone(),
+							mint_to: destination_account.clone(),
+							witness_data: None,
+						})
+						.encode()
+						.into(),
+					},
+				]),
+			) {
+				Ok((_hash, _cost)) => {
+					//If in received list, burn asset and remove from received list 
+					if ReceivedAssets::<T, I>::contains_key(&(origin_collection.clone(), origin_asset.clone())) {
+						//Retrieve origin chain and asset
+						if let Some(received) = ReceivedAssets::<T, I>::get(&(origin_collection.clone(), origin_asset.clone())).as_ref() {
+							// Use `received` as a reference
+							SentAssets::<T, I>::insert(
+								(origin_collection.clone(), origin_asset.clone()),
+								SentStruct {
+									origin_para_id: received.origin_para_id,
+									origin_collection_id: received.origin_collection_id,
+									origin_asset_id: received.origin_asset_id,
+									destination_collection_id: destination_collection.clone(),
+									destination_asset_id: destination_asset.clone(),
+								},
+							);
+						}
+
+						//Remove from received assets
+						ReceivedAssets::<T, I>::remove(&(origin_collection.clone(), origin_asset.clone()));
+						//Burn the asset
+						pallet_nfts::Pallet::<T, I>::burn(origin.clone(), origin_collection.clone(), origin_asset.clone());
+					}
+					//Else only remove metadata, config and price
+					else{
+						if pallet_nfts::ItemMetadataOf::<T, I>::contains_key(&origin_collection, &origin_asset) {
+							pallet_nfts::ItemMetadataOf::<T, I>::remove(&origin_collection, &origin_asset);
+						}
+						if pallet_nfts::ItemConfigOf::<T, I>::contains_key(&origin_collection, &origin_asset) {
+							pallet_nfts::ItemConfigOf::<T, I>::remove(&origin_collection, &origin_asset);
+						}
+						if pallet_nfts::ItemPriceOf::<T, I>::contains_key(&origin_collection, &origin_asset) {
+							pallet_nfts::ItemPriceOf::<T, I>::remove(&origin_collection, &origin_asset);
+						}	
+
+						//Create sent asset
+						SentAssets::<T, I>::insert((origin_collection.clone(), origin_asset.clone()), SentStruct {
+							origin_para_id:parachain_info::Pallet::<T>::parachain_id(),
+							origin_collection_id: origin_collection.clone(),
+							origin_asset_id: origin_asset.clone(),
+							destination_collection_id: destination_collection.clone(),
+							destination_asset_id: destination_asset.clone(),
+						});
+					}
+					//Emit event
+					Self::deposit_event(Event::NFTTransferred {
+						origin_collection_id: origin_collection.clone(),
+						origin_asset_id: origin_asset.clone(),
+						destination_para_id: destination_para,
+						destination_collection_id: destination_collection.clone(),
+						destination_asset_id: destination_asset.clone(),
+						to_address: destination_account,
+					});
+				},
+				Err(e) => Self::deposit_event(Event::CollectionFailedToXCM {
+					e,
+					collection_id: origin_collection.clone(),
+					owner: who.clone(),
+					destination: destination_para.clone(),
+				}),
+			}
+			Ok(().into())
+		}
+
+		#[pallet::call_index(4)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn nftXclaim(origin: OriginFor<T>, origin_collection: T::CollectionId, origin_asset: T::ItemId, current_collection: T::CollectionId ,current_asset: T::ItemId) -> DispatchResultWithPostInfo {
+			//Check if user owns the asset
+			let who = ensure_signed(origin.clone())?;
+
+			//See if collection exists
+			let collection_exists = pallet_nfts::Collection::<T, I>::contains_key(&current_collection);
+			ensure!(collection_exists, Error::<T, I>::CollectionDoesNotExist);
+
+			//See if origin collection exists
+			let received_collection = ReceivedCollections::<T, I>::get(origin_collection.clone()).unwrap().received_collection_id;
+			let origin_collection_exists = pallet_nfts::Collection::<T, I>::contains_key(&origin_collection);
+			ensure!(origin_collection_exists, Error::<T, I>::CollectionDoesNotExist);
+
+			//See if current asset is in received assets
+			let asset_exists = ReceivedAssets::<T, I>::contains_key(&(current_collection.clone(), current_asset.clone()));
+			ensure!(asset_exists, Error::<T, I>::NFTNotReceived);
+
+			//See if item in origin collection exists
+			let item_exists = pallet_nfts::Item::<T, I>::contains_key(&received_collection, &origin_asset);
+			ensure!(item_exists, Error::<T, I>::NFTDoesNotExist);
+
+			//See if user owns the item
+			let owner = pallet_nfts::Pallet::<T,I>::owner(received_collection.clone(), origin_asset.clone()).ok_or(Error::<T, I>::NFTDoesNotExist)?;
+			ensure!(owner == who.clone(), Error::<T, I>::NotNFTOwner);
+
+			//See if user owns the current asset
+			let current_owner = pallet_nfts::Pallet::<T,I>::owner(current_collection.clone(), current_asset.clone()).ok_or(Error::<T, I>::NFTDoesNotExist)?;
+			ensure!(current_owner == who.clone(), Error::<T, I>::NotNFTOwner);
+
+			//Claim the asset
+			//Get the asset metadata
+			let mut metadata = None;
+			if pallet_nfts::ItemMetadataOf::<T, I>::contains_key(current_collection.clone(), current_asset.clone()) {
+				metadata = pallet_nfts::Pallet::<T, I>::item_data(current_collection.clone(), current_asset.clone());
+			}
+
+			//Burn the current asset
+			pallet_nfts::Pallet::<T, I>::burn(origin.clone(), current_collection.clone(), current_asset.clone());
+
+			//Add the metadata to the old asset
+			pallet_nfts::Pallet::<T, I>::set_metadata(origin.clone(), received_collection.clone(), origin_asset.clone(), metadata.unwrap());
+
+			//Remove asset from received
+			ReceivedAssets::<T, I>::remove(&(current_collection.clone(), current_asset.clone()));
+
+			//Emit event
+			Self::deposit_event(Event::NFTClaimed {
+				collection_claimed_from: current_collection.clone(),
+				asset_removed: current_asset.clone(),
+				collection_claimed_to: received_collection.clone(),
+				asset_claimed: origin_asset.clone(),
+			});
+
+			Ok(().into())
+		}
 	}
 }

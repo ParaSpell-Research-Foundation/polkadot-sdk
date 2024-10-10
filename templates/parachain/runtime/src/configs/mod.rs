@@ -340,8 +340,8 @@ impl pallet_parachain_xcnft::Config for Runtime {
 }
 pub const UNIT: Balance = 1;
 parameter_types! {
-	pub const CollectionDeposit: Balance = 1 * UNIT; // 1 UNIT deposit to create asset collection
-	pub const ItemDeposit: Balance = 1 * UNIT; // 1/100 UNIT deposit to create asset item
+	pub const CollectionDeposit: Balance = 10000000000000 * UNIT; // 1 UNIT deposit to create asset collection
+	pub const ItemDeposit: Balance = 10000000000000 * UNIT; // 1/100 UNIT deposit to create asset item
 	pub const KeyLimit: u32 = 32;	
 	pub const ValueLimit: u32 = 64;
 	pub const UniquesMetadataDepositBase: Balance = 1 * UNIT;

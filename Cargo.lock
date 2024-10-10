@@ -12355,6 +12355,7 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 14.0.0",
+ "staging-parachain-info",
  "staging-xcm",
 ]
 
