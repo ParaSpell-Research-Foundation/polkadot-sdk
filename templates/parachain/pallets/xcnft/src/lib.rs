@@ -49,6 +49,7 @@
 //! - `pallet-nfts`
 //! - `pallet-uniques`
 //! - `pallet-balances`
+//! - `parachain-info`
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -70,7 +71,8 @@ mod benchmarking;
 #[frame_support::pallet]
 pub mod pallet {
 
-	use frame_system::pallet_prelude::*;
+	use cumulus_pallet_xcm::Origin;
+use frame_system::pallet_prelude::*;
 	use sp_runtime::traits::{CheckedAdd, One};
 	use frame_support::{dispatch::DispatchResultWithPostInfo, pallet_prelude::*, sp_runtime::traits::Hash, traits::{Currency, LockableCurrency, ReservableCurrency}, DefaultNoBound};
 	use frame_support::traits::PalletInfo;
@@ -79,7 +81,7 @@ pub mod pallet {
 	use scale_info::prelude::vec;
 	use sp_std::prelude::*;
 	use xcm::latest::prelude::*;
-	use pallet_nfts::{AttributeNamespace, Call as NftsCall, ItemDetails, ItemMetadata, CollectionDetails};
+	use pallet_nfts::{AttributeNamespace, Call as NftsCall, ItemDetails, ItemMetadata, CollectionDetails, DestroyWitness};
 	use core::marker::PhantomData;
 	
 	pub type BalanceOf<T, I = ()> =
@@ -286,12 +288,77 @@ pub mod pallet {
 			to_address: AccountIdLookupOf<T>,
 		},
 
+		/// Event emitted when non-fungible asset is claimed into collection that was also sent cross-chain
 		NFTClaimed {
 			collection_claimed_from: T::CollectionId,
 			asset_removed: T::ItemId,
 			collection_claimed_to: T::CollectionId,
 			asset_claimed: T::ItemId,
-		}
+		},
+
+		/// Event emitted when cross-chain collection metadata transfer fails
+		ColMetadataFailedToXCM {
+			e: SendError,
+			collection_id: T::CollectionId,
+			owner: T::AccountId,
+			destination: ParaId,
+		},
+	
+		/// Event emitted when collection metadata is transferred cross-chain
+		ColMetadataSent{
+			collection_id: T::CollectionId,
+			owner: T::AccountId,
+			destination: ParaId,
+		},
+
+		/// Event emitted when cross-chain NFT metadata transfer fails
+		NFTMetadataFailedToXCM {
+			e: SendError,
+			collection_id: T::CollectionId,
+			asset_id: T::ItemId,
+			owner: T::AccountId,
+			destination: ParaId,
+		},
+			
+		/// Event emitted when NFT metadata is transferred cross-chain
+		NFTMetadataSent{
+			collection_id: T::CollectionId,
+			asset_id: T::ItemId,
+			owner: T::AccountId,
+			destination: ParaId,
+		},
+
+		/// Event emitted when cross-chain collection burn call transfer fails
+		ColBurnFailedToXCM {
+			e: SendError,
+			collection_id: T::CollectionId,
+			owner: T::AccountId,
+			destination: ParaId,
+		},
+					
+		/// Event emitted when collection burn call is transferred cross-chain
+		ColBurnSent{
+			collection_id: T::CollectionId,
+			owner: T::AccountId,
+			destination: ParaId,
+		},
+
+		/// Event emitted when cross-chain NFT burn call transfer fails
+		NFTBurnFailedToXCM {
+			e: SendError,
+			collection_id: T::CollectionId,
+			asset_id: T::ItemId,
+			owner: T::AccountId,
+			destination: ParaId,
+		},
+							
+		/// Event emitted when NFT burn call is transferred cross-chain
+		NFTBurnSent{
+			collection_id: T::CollectionId,
+			asset_id: T::ItemId,
+			owner: T::AccountId,
+			destination: ParaId,
+		},
 	}
 
 	/// <https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html#event-and-error>
@@ -972,6 +1039,190 @@ pub mod pallet {
 				asset_claimed: origin_asset.clone(),
 			});
 
+			Ok(().into())
+		}
+	
+		///Updates the collection metadata cross-chain
+		#[pallet::call_index(5)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn collectionXupdate(origin: OriginFor<T>, destination_collection_id: T::CollectionId, destination_para: ParaId , data: BoundedVec<u8, T::StringLimit>) -> DispatchResultWithPostInfo {
+			let who = ensure_signed(origin)?;
+
+			//Send the prompt to update 
+			match send_xcm::<T::XcmSender>(
+				(Parent, Junction::Parachain(destination_para.into())).into(),
+				Xcm(vec![
+					UnpaidExecution { weight_limit: Unlimited, check_origin: None },
+					Transact {
+						origin_kind: OriginKind::SovereignAccount,
+						require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
+						call: <T as Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
+							T,
+							I,
+						>::set_collection_metadata {
+							collection: destination_collection_id.clone(),
+							data: data.clone(),
+						})
+						.encode()
+						.into(),
+					},
+				]),
+			) {
+				Ok((_hash, _cost)) => {
+					//Emit event about sucessful metadata send
+					Self::deposit_event(Event::ColMetadataSent {
+						collection_id: destination_collection_id.clone(),
+						owner: who.clone(),
+						destination: destination_para.clone(),
+					});
+
+				},
+				Err(e) => Self::deposit_event(Event::ColMetadataFailedToXCM {
+					e,
+					collection_id: destination_collection_id.clone(),
+					owner: who.clone(),
+					destination: destination_para.clone(),
+				}),
+			}
+			Ok(().into())
+		}
+	
+		///Updates the item metadata cross-chain
+		#[pallet::call_index(6)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn nftXupdate(origin: OriginFor<T>, destination_collection_id: T::CollectionId, destination_asset_id: T::ItemId, destination_para: ParaId , data: BoundedVec<u8, T::StringLimit>) -> DispatchResultWithPostInfo {
+			let who = ensure_signed(origin)?;
+
+			match send_xcm::<T::XcmSender>(
+				(Parent, Junction::Parachain(destination_para.into())).into(),
+				Xcm(vec![
+					UnpaidExecution { weight_limit: Unlimited, check_origin: None },
+					Transact {
+						origin_kind: OriginKind::SovereignAccount,
+						require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
+						call: <T as Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
+							T,
+							I,
+						>::set_metadata {
+							collection: destination_collection_id.clone(),
+							item: destination_asset_id.clone(),
+							data: data.clone(),
+						})
+						.encode()
+						.into(),
+					},
+				]),
+			) {
+				Ok((_hash, _cost)) => {
+					//Emit event about sucessful metadata send
+					Self::deposit_event(Event::NFTMetadataSent {
+						collection_id: destination_collection_id.clone(),
+						asset_id: destination_asset_id.clone(),
+						owner: who.clone(),
+						destination: destination_para.clone(),
+					});
+
+				},
+				Err(e) => Self::deposit_event(Event::NFTMetadataFailedToXCM {
+					e,
+					collection_id: destination_collection_id.clone(),
+					asset_id: destination_asset_id.clone(),
+					owner: who.clone(),
+					destination: destination_para.clone(),
+				}),
+			}
+			Ok(().into())
+		}
+	
+		///Burns the collection cross-chain
+		#[pallet::call_index(7)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn collectionXburn(origin: OriginFor<T>, destination_collection_id: T::CollectionId, destination_para: ParaId, witnes_data: pallet_nfts::DestroyWitness) -> DispatchResultWithPostInfo {
+			let who = ensure_signed(origin)?;
+
+			match send_xcm::<T::XcmSender>(
+				(Parent, Junction::Parachain(destination_para.into())).into(),
+				Xcm(vec![
+					UnpaidExecution { weight_limit: Unlimited, check_origin: None },
+					Transact {
+						origin_kind: OriginKind::SovereignAccount,
+						require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
+						call: <T as Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
+							T,
+							I,
+						>::destroy {
+							collection: destination_collection_id.clone(),
+							witness: witnes_data.clone(),
+						})
+						.encode()
+						.into(),
+					},
+				]),
+			) {
+				Ok((_hash, _cost)) => {
+					//Emit event about sucessful metadata send
+					Self::deposit_event(Event::ColBurnSent {
+						collection_id: destination_collection_id.clone(),
+						owner: who.clone(),
+						destination: destination_para.clone(),
+					});
+
+				},
+				Err(e) => Self::deposit_event(Event::ColBurnFailedToXCM {
+					e,
+					collection_id: destination_collection_id.clone(),
+					owner: who.clone(),
+					destination: destination_para.clone(),
+				}),
+			}
+		
+			Ok(().into())
+		}
+
+		///Burns the item cross-chain
+		#[pallet::call_index(8)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn nftXburn (origin: OriginFor<T>, destination_collection_id: T::CollectionId, destination_asset_id: T::ItemId, destination_para: ParaId) -> DispatchResultWithPostInfo {
+			let who = ensure_signed(origin)?;
+			
+			match send_xcm::<T::XcmSender>(
+				(Parent, Junction::Parachain(destination_para.into())).into(),
+				Xcm(vec![
+					UnpaidExecution { weight_limit: Unlimited, check_origin: None },
+					Transact {
+						origin_kind: OriginKind::SovereignAccount,
+						require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
+						call: <T as Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
+							T,
+							I,
+						>::burn {
+							collection: destination_collection_id.clone(),
+							item: destination_asset_id.clone(),
+						})
+						.encode()
+						.into(),
+					},
+				]),
+			) {
+				Ok((_hash, _cost)) => {
+					//Emit event about sucessful metadata send
+					Self::deposit_event(Event::NFTBurnSent {
+						collection_id: destination_collection_id.clone(),
+						asset_id: destination_asset_id.clone(),
+						owner: who.clone(),
+						destination: destination_para.clone(),
+					});
+
+				},
+				Err(e) => Self::deposit_event(Event::NFTBurnFailedToXCM {
+					e,
+					collection_id: destination_collection_id.clone(),
+					asset_id: destination_asset_id.clone(),
+					owner: who.clone(),
+					destination: destination_para.clone(),
+				}),
+			}
+		
 			Ok(().into())
 		}
 	}
