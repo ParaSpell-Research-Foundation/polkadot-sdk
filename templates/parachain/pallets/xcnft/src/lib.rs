@@ -359,6 +359,38 @@ use frame_system::pallet_prelude::*;
 			owner: T::AccountId,
 			destination: ParaId,
 		},
+
+		/// Event emitted when cross-chain Collection ownership call transfer fails
+		ColOwnershipFailedToXCM {
+			e: SendError,
+			collection_id: T::CollectionId,
+			proposed_owner: AccountIdLookupOf<T>,
+			destination: ParaId,
+		},
+									
+		/// Event emitted when Collection ownership call is transferred cross-chain
+		ColOwnershipSent{
+			collection_id: T::CollectionId,
+			proposed_owner: AccountIdLookupOf<T>,
+			destination: ParaId,
+		},
+
+		/// Event emitted when cross-chain NFT ownership call transfer fails
+		NFTOwnershipFailedToXCM {
+			e: SendError,
+			collection_id: T::CollectionId,
+			asset_id: T::ItemId,
+			proposed_owner: AccountIdLookupOf<T>,
+			destination: ParaId,
+		},
+											
+		/// Event emitted when NFT ownership call is transferred cross-chain
+		NFTOwnershipSent{
+			collection_id: T::CollectionId,
+			asset_id: T::ItemId,
+			proposed_owner: AccountIdLookupOf<T>,
+			destination: ParaId,
+		},
 	}
 
 	/// <https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html#event-and-error>
@@ -1219,6 +1251,99 @@ use frame_system::pallet_prelude::*;
 					collection_id: destination_collection_id.clone(),
 					asset_id: destination_asset_id.clone(),
 					owner: who.clone(),
+					destination: destination_para.clone(),
+				}),
+			}
+		
+			Ok(().into())
+		}
+
+		///Change collection ownership
+		#[pallet::call_index(9)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn collectionXchangeOwner(origin: OriginFor<T>, destination_collection_id: T::CollectionId, destination_para: ParaId, destination_account: AccountIdLookupOf<T>) -> DispatchResultWithPostInfo {
+			ensure_signed(origin)?;
+
+			match send_xcm::<T::XcmSender>(
+				(Parent, Junction::Parachain(destination_para.into())).into(),
+				Xcm(vec![
+					UnpaidExecution { weight_limit: Unlimited, check_origin: None },
+					Transact {
+						origin_kind: OriginKind::SovereignAccount,
+						require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
+						call: <T as Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
+							T,
+							I,
+						>::transfer_ownership {
+							collection: destination_collection_id.clone(),
+							new_owner: destination_account.clone(),
+						})
+						.encode()
+						.into(),
+					},
+				]),
+			) {
+				Ok((_hash, _cost)) => {
+					//Emit event about sucessful metadata send
+					Self::deposit_event(Event::ColOwnershipSent {
+						collection_id: destination_collection_id.clone(),
+						proposed_owner: destination_account.clone(),
+						destination: destination_para.clone(),
+					});
+
+				},
+				Err(e) => Self::deposit_event(Event::ColOwnershipFailedToXCM {
+					e,
+					collection_id: destination_collection_id.clone(),
+					proposed_owner: destination_account.clone(),
+					destination: destination_para.clone(),
+				}),
+			}
+		
+			Ok(().into())
+		}
+
+		///Change item ownership
+		#[pallet::call_index(10)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn nftXchangeOwner(origin: OriginFor<T>, destination_collection_id: T::CollectionId, destination_asset_id: T::ItemId, destination_para: ParaId, destination_account: AccountIdLookupOf<T>) -> DispatchResultWithPostInfo {
+			ensure_signed(origin)?;
+
+			match send_xcm::<T::XcmSender>(
+				(Parent, Junction::Parachain(destination_para.into())).into(),
+				Xcm(vec![
+					UnpaidExecution { weight_limit: Unlimited, check_origin: None },
+					Transact {
+						origin_kind: OriginKind::SovereignAccount,
+						require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
+						call: <T as Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
+							T,
+							I,
+						>::transfer {
+							collection: destination_collection_id.clone(),
+							item: destination_asset_id.clone(),
+							dest: destination_account.clone(),
+						})
+						.encode()
+						.into(),
+					},
+				]),
+			) {
+				Ok((_hash, _cost)) => {
+					//Emit event about sucessful metadata send
+					Self::deposit_event(Event::NFTOwnershipSent {
+						collection_id: destination_collection_id.clone(),
+						asset_id: destination_asset_id.clone(),
+						proposed_owner: destination_account.clone(),
+						destination: destination_para.clone(),
+					});
+
+				},
+				Err(e) => Self::deposit_event(Event::NFTOwnershipFailedToXCM {
+					e,
+					collection_id: destination_collection_id.clone(),
+					asset_id: destination_asset_id.clone(),
+					proposed_owner: destination_account.clone(),
 					destination: destination_para.clone(),
 				}),
 			}
