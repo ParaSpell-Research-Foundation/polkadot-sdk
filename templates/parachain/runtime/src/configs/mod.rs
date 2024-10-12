@@ -332,6 +332,7 @@ impl pallet_parachain_template::Config for Runtime {
 
 impl pallet_parachain_xcnft::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
+	type XcNftCall = RuntimeCall;
 	type WeightInfo = pallet_parachain_xcnft::weights::SubstrateWeight<Runtime>;
 	type XcmSender = xcm_config::XcmRouter;
 	type RuntimeCall = RuntimeCall;

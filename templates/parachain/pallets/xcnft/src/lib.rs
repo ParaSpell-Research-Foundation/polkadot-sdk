@@ -73,7 +73,7 @@ pub mod pallet {
 
 	use cumulus_pallet_xcm::Origin;
 use frame_system::pallet_prelude::*;
-	use sp_runtime::traits::{CheckedAdd, One};
+	use sp_runtime::traits::{AccountIdLookup, CheckedAdd, One};
 	use frame_support::{dispatch::DispatchResultWithPostInfo, pallet_prelude::*, sp_runtime::traits::Hash, traits::{Currency, LockableCurrency, ReservableCurrency}, DefaultNoBound};
 	use frame_support::traits::PalletInfo;
 	use codec::Encode;
@@ -83,7 +83,10 @@ use frame_system::pallet_prelude::*;
 	use xcm::latest::prelude::*;
 	use pallet_nfts::{AttributeNamespace, Call as NftsCall, ItemDetails, ItemMetadata, CollectionDetails, DestroyWitness};
 	use core::marker::PhantomData;
-	
+	use crate::pallet::Call as XcNftCall;
+	use log::{debug, info, trace};
+
+
 	pub type BalanceOf<T, I = ()> =
 	<<T as pallet_nfts::Config<I>>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 	use sp_runtime::traits::StaticLookup;
@@ -106,6 +109,9 @@ use frame_system::pallet_prelude::*;
 
 		/// The overarching call type; we assume sibling chains use the same type.
 		type RuntimeCall:From<pallet_nfts::Call<Self, I>> + Encode; //Potom zmenit nazad na  From<Call<Self, I>> + Encode;
+
+		///Runtime call for XcNftCall
+		type XcNftCall: From<XcNftCall<Self, I>> + Encode;
 
 		/// The sender to use for cross-chain messages.
 		type XcmSender: SendXcm;
@@ -300,6 +306,7 @@ use frame_system::pallet_prelude::*;
 		ColMetadataFailedToXCM {
 			e: SendError,
 			collection_id: T::CollectionId,
+			proposed_data: BoundedVec<u8, T::StringLimit>,
 			owner: T::AccountId,
 			destination: ParaId,
 		},
@@ -307,6 +314,7 @@ use frame_system::pallet_prelude::*;
 		/// Event emitted when collection metadata is transferred cross-chain
 		ColMetadataSent{
 			collection_id: T::CollectionId,
+			proposed_data: BoundedVec<u8, T::StringLimit>,
 			owner: T::AccountId,
 			destination: ParaId,
 		},
@@ -316,6 +324,7 @@ use frame_system::pallet_prelude::*;
 			e: SendError,
 			collection_id: T::CollectionId,
 			asset_id: T::ItemId,
+			proposed_data: BoundedVec<u8, T::StringLimit>,
 			owner: T::AccountId,
 			destination: ParaId,
 		},
@@ -324,6 +333,7 @@ use frame_system::pallet_prelude::*;
 		NFTMetadataSent{
 			collection_id: T::CollectionId,
 			asset_id: T::ItemId,
+			proposed_data: BoundedVec<u8, T::StringLimit>,
 			owner: T::AccountId,
 			destination: ParaId,
 		},
@@ -332,6 +342,7 @@ use frame_system::pallet_prelude::*;
 		ColBurnFailedToXCM {
 			e: SendError,
 			collection_id: T::CollectionId,
+			burn_data: pallet_nfts::DestroyWitness,
 			owner: T::AccountId,
 			destination: ParaId,
 		},
@@ -339,6 +350,7 @@ use frame_system::pallet_prelude::*;
 		/// Event emitted when collection burn call is transferred cross-chain
 		ColBurnSent{
 			collection_id: T::CollectionId,
+			burn_data: pallet_nfts::DestroyWitness,
 			owner: T::AccountId,
 			destination: ParaId,
 		},
@@ -391,6 +403,22 @@ use frame_system::pallet_prelude::*;
 			proposed_owner: AccountIdLookupOf<T>,
 			destination: ParaId,
 		},
+
+		CollectionReceived {
+			origin_collection_id: T::CollectionId,
+			received_collection_id: T::CollectionId,
+			to_address: AccountIdLookupOf<T>,
+		},
+
+		CollectionAlreadyReceived{
+			origin_collection_id: T::CollectionId,
+			to_address: AccountIdLookupOf<T>,
+		},
+
+		CollectionCreationFailed {
+			error: DispatchError,
+			owner: AccountIdLookupOf<T>,
+		},
 	}
 
 	/// <https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html#event-and-error>
@@ -420,7 +448,7 @@ use frame_system::pallet_prelude::*;
 
 		#[pallet::call_index(0)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn collectionXtransfer(origin: OriginFor<T>, origin_collection: T::CollectionId, destination_para: ParaId, destination_account: AccountIdLookupOf<T>, config: CollectionConfigFor<T, I> ) -> DispatchResultWithPostInfo {
+		pub fn collection_x_transfer(origin: OriginFor<T>, origin_collection: T::CollectionId, destination_para: ParaId, destination_account: AccountIdLookupOf<T>, config: CollectionConfigFor<T, I> ) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin.clone())?;
 
 			//See if collection exists
@@ -452,12 +480,14 @@ use frame_system::pallet_prelude::*;
 						Transact {
 							origin_kind: OriginKind::SovereignAccount,
 							require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
-							call: <T as Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
+							call: <T as Config<I>>::XcNftCall::from(Call::<
 								T,
 								I,
-							>::create {
-								admin: destination_account.clone(),
+							>::parse_collection_empty {
+								origin_collection: origin_collection.clone(),
+								receiving_account: destination_account.clone(),
 								config,
+								origin_para: parachain_info::Pallet::<T>::parachain_id(), 
 							})
 							.encode()
 							.into(),
@@ -621,7 +651,7 @@ use frame_system::pallet_prelude::*;
 
 						//Burning the NFTs
 						for item_id in items.clone() {
-							pallet_nfts::Pallet::<T, I>::burn(origin.clone(), origin_collection.clone(), item_id);
+							let _ = pallet_nfts::Pallet::<T, I>::burn(origin.clone(), origin_collection.clone(), item_id);
 						}
 						//Burning the collection
 						if let Some(col_deposit) = pallet_nfts::Pallet::<T, I>::deposit(origin_collection) {
@@ -658,10 +688,9 @@ use frame_system::pallet_prelude::*;
 			Ok(().into())
 		}
 
-
 		#[pallet::call_index(1)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn collectionXtransferVote(origin: OriginFor<T>, proposal_id: u64, actual_vote: Vote) -> DispatchResultWithPostInfo {
+		pub fn collection_x_transfer_vote(origin: OriginFor<T>, proposal_id: u64, actual_vote: Vote) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
 			let proposal = CrossChainProposals::<T, I>::get(proposal_id);
@@ -730,7 +759,7 @@ use frame_system::pallet_prelude::*;
 
 		#[pallet::call_index(2)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn collectionXtransferInitiate(origin: OriginFor<T>, proposal_id: u64) -> DispatchResultWithPostInfo{
+		pub fn collection_x_transfer_initiate(origin: OriginFor<T>, proposal_id: u64) -> DispatchResultWithPostInfo{
 			let who = ensure_signed(origin.clone())?;
 		
 			let proposal = CrossChainProposals::<T, I>::get(proposal_id);
@@ -761,7 +790,7 @@ use frame_system::pallet_prelude::*;
 				// (Implementation for transfer goes here)
 
 				//Get the collection metadata
-				let mut collection_metadata;
+				let collection_metadata;
 				if pallet_nfts::CollectionMetadataOf::<T, I>::contains_key(proposal.collection_id.clone()){
 					collection_metadata = pallet_nfts::CollectionMetadataOf::<T, I>::get(proposal.collection_id.clone()).unwrap();
 				}
@@ -782,7 +811,7 @@ use frame_system::pallet_prelude::*;
 					//If we have no items meanwhile we might as well just transfer the collection through regular function
 					//remove proposal
 					CrossChainProposals::<T, I>::remove(proposal_id);
-					Self::collectionXtransfer(origin, proposal.collection_id, proposal.proposed_destination_para, T::Lookup::unlookup(proposal.proposed_collection_owner.clone()), proposal.proposed_destination_config.clone())?;
+					Self::collection_x_transfer(origin, proposal.collection_id, proposal.proposed_destination_para, T::Lookup::unlookup(proposal.proposed_collection_owner.clone()), proposal.proposed_destination_config.clone())?;
 				}
 
 				for item_id in items.clone() {
@@ -907,7 +936,7 @@ use frame_system::pallet_prelude::*;
 
 		#[pallet::call_index(3)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn nftXtransfer(origin: OriginFor<T>, origin_collection: T::CollectionId, origin_asset: T::ItemId, destination_para: ParaId, destination_account: AccountIdLookupOf<T>, destination_collection: T::CollectionId, destination_asset: T::ItemId ) -> DispatchResultWithPostInfo {
+		pub fn nft_x_transfer(origin: OriginFor<T>, origin_collection: T::CollectionId, origin_asset: T::ItemId, destination_para: ParaId, destination_account: AccountIdLookupOf<T>, destination_collection: T::CollectionId, destination_asset: T::ItemId ) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin.clone())?;
 
 			//See if collection exists
@@ -973,7 +1002,7 @@ use frame_system::pallet_prelude::*;
 						//Remove from received assets
 						ReceivedAssets::<T, I>::remove(&(origin_collection.clone(), origin_asset.clone()));
 						//Burn the asset
-						pallet_nfts::Pallet::<T, I>::burn(origin.clone(), origin_collection.clone(), origin_asset.clone());
+						let _ = pallet_nfts::Pallet::<T, I>::burn(origin.clone(), origin_collection.clone(), origin_asset.clone());
 					}
 					//Else only remove metadata, config and price
 					else{
@@ -1018,7 +1047,7 @@ use frame_system::pallet_prelude::*;
 
 		#[pallet::call_index(4)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn nftXclaim(origin: OriginFor<T>, origin_collection: T::CollectionId, origin_asset: T::ItemId, current_collection: T::CollectionId ,current_asset: T::ItemId) -> DispatchResultWithPostInfo {
+		pub fn nft_x_claim(origin: OriginFor<T>, origin_collection: T::CollectionId, origin_asset: T::ItemId, current_collection: T::CollectionId ,current_asset: T::ItemId) -> DispatchResultWithPostInfo {
 			//Check if user owns the asset
 			let who = ensure_signed(origin.clone())?;
 
@@ -1055,10 +1084,10 @@ use frame_system::pallet_prelude::*;
 			}
 
 			//Burn the current asset
-			pallet_nfts::Pallet::<T, I>::burn(origin.clone(), current_collection.clone(), current_asset.clone());
+			let _ = pallet_nfts::Pallet::<T, I>::burn(origin.clone(), current_collection.clone(), current_asset.clone());
 
 			//Add the metadata to the old asset
-			pallet_nfts::Pallet::<T, I>::set_metadata(origin.clone(), received_collection.clone(), origin_asset.clone(), metadata.unwrap());
+			let _ = pallet_nfts::Pallet::<T, I>::set_metadata(origin.clone(), received_collection.clone(), origin_asset.clone(), metadata.unwrap());
 
 			//Remove asset from received
 			ReceivedAssets::<T, I>::remove(&(current_collection.clone(), current_asset.clone()));
@@ -1077,7 +1106,7 @@ use frame_system::pallet_prelude::*;
 		///Updates the collection metadata cross-chain
 		#[pallet::call_index(5)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn collectionXupdate(origin: OriginFor<T>, destination_collection_id: T::CollectionId, destination_para: ParaId , data: BoundedVec<u8, T::StringLimit>) -> DispatchResultWithPostInfo {
+		pub fn collection_x_update(origin: OriginFor<T>, destination_collection_id: T::CollectionId, destination_para: ParaId , data: BoundedVec<u8, T::StringLimit>) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
 			//Send the prompt to update 
@@ -1104,6 +1133,7 @@ use frame_system::pallet_prelude::*;
 					//Emit event about sucessful metadata send
 					Self::deposit_event(Event::ColMetadataSent {
 						collection_id: destination_collection_id.clone(),
+						proposed_data: data.clone(),
 						owner: who.clone(),
 						destination: destination_para.clone(),
 					});
@@ -1112,6 +1142,7 @@ use frame_system::pallet_prelude::*;
 				Err(e) => Self::deposit_event(Event::ColMetadataFailedToXCM {
 					e,
 					collection_id: destination_collection_id.clone(),
+					proposed_data: data.clone(),
 					owner: who.clone(),
 					destination: destination_para.clone(),
 				}),
@@ -1122,7 +1153,7 @@ use frame_system::pallet_prelude::*;
 		///Updates the item metadata cross-chain
 		#[pallet::call_index(6)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn nftXupdate(origin: OriginFor<T>, destination_collection_id: T::CollectionId, destination_asset_id: T::ItemId, destination_para: ParaId , data: BoundedVec<u8, T::StringLimit>) -> DispatchResultWithPostInfo {
+		pub fn nft_x_update(origin: OriginFor<T>, destination_collection_id: T::CollectionId, destination_asset_id: T::ItemId, destination_para: ParaId , data: BoundedVec<u8, T::StringLimit>) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
 			match send_xcm::<T::XcmSender>(
@@ -1150,6 +1181,7 @@ use frame_system::pallet_prelude::*;
 					Self::deposit_event(Event::NFTMetadataSent {
 						collection_id: destination_collection_id.clone(),
 						asset_id: destination_asset_id.clone(),
+						proposed_data: data.clone(),
 						owner: who.clone(),
 						destination: destination_para.clone(),
 					});
@@ -1159,6 +1191,7 @@ use frame_system::pallet_prelude::*;
 					e,
 					collection_id: destination_collection_id.clone(),
 					asset_id: destination_asset_id.clone(),
+					proposed_data: data.clone(),
 					owner: who.clone(),
 					destination: destination_para.clone(),
 				}),
@@ -1169,7 +1202,7 @@ use frame_system::pallet_prelude::*;
 		///Burns the collection cross-chain
 		#[pallet::call_index(7)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn collectionXburn(origin: OriginFor<T>, destination_collection_id: T::CollectionId, destination_para: ParaId, witnes_data: pallet_nfts::DestroyWitness) -> DispatchResultWithPostInfo {
+		pub fn collection_x_burn(origin: OriginFor<T>, destination_collection_id: T::CollectionId, destination_para: ParaId, witnes_data: pallet_nfts::DestroyWitness) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
 			match send_xcm::<T::XcmSender>(
@@ -1195,6 +1228,7 @@ use frame_system::pallet_prelude::*;
 					//Emit event about sucessful metadata send
 					Self::deposit_event(Event::ColBurnSent {
 						collection_id: destination_collection_id.clone(),
+						burn_data: witnes_data.clone(),
 						owner: who.clone(),
 						destination: destination_para.clone(),
 					});
@@ -1203,6 +1237,7 @@ use frame_system::pallet_prelude::*;
 				Err(e) => Self::deposit_event(Event::ColBurnFailedToXCM {
 					e,
 					collection_id: destination_collection_id.clone(),
+					burn_data: witnes_data.clone(),
 					owner: who.clone(),
 					destination: destination_para.clone(),
 				}),
@@ -1214,7 +1249,7 @@ use frame_system::pallet_prelude::*;
 		///Burns the item cross-chain
 		#[pallet::call_index(8)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn nftXburn (origin: OriginFor<T>, destination_collection_id: T::CollectionId, destination_asset_id: T::ItemId, destination_para: ParaId) -> DispatchResultWithPostInfo {
+		pub fn nft_x_burn (origin: OriginFor<T>, destination_collection_id: T::CollectionId, destination_asset_id: T::ItemId, destination_para: ParaId) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 			
 			match send_xcm::<T::XcmSender>(
@@ -1261,7 +1296,7 @@ use frame_system::pallet_prelude::*;
 		///Change collection ownership
 		#[pallet::call_index(9)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn collectionXchangeOwner(origin: OriginFor<T>, destination_collection_id: T::CollectionId, destination_para: ParaId, destination_account: AccountIdLookupOf<T>) -> DispatchResultWithPostInfo {
+		pub fn collection_x_change_owner(origin: OriginFor<T>, destination_collection_id: T::CollectionId, destination_para: ParaId, destination_account: AccountIdLookupOf<T>) -> DispatchResultWithPostInfo {
 			ensure_signed(origin)?;
 
 			match send_xcm::<T::XcmSender>(
@@ -1306,7 +1341,7 @@ use frame_system::pallet_prelude::*;
 		///Change item ownership
 		#[pallet::call_index(10)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn nftXchangeOwner(origin: OriginFor<T>, destination_collection_id: T::CollectionId, destination_asset_id: T::ItemId, destination_para: ParaId, destination_account: AccountIdLookupOf<T>) -> DispatchResultWithPostInfo {
+		pub fn nft_x_change_owner(origin: OriginFor<T>, destination_collection_id: T::CollectionId, destination_asset_id: T::ItemId, destination_para: ParaId, destination_account: AccountIdLookupOf<T>) -> DispatchResultWithPostInfo {
 			ensure_signed(origin)?;
 
 			match send_xcm::<T::XcmSender>(
@@ -1350,5 +1385,53 @@ use frame_system::pallet_prelude::*;
 		
 			Ok(().into())
 		}
+
+		#[pallet::call_index(11)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn parse_collection_empty(origin: OriginFor<T> ,origin_collection: T::CollectionId, receiving_account: AccountIdLookupOf<T>,  config: CollectionConfigFor<T, I>, origin_para: ParaId) -> DispatchResultWithPostInfo {
+			//Check if received collection doesn't consist of same id
+			info!(target: "substrate", "✨ UNABLE TO CRAETE COLLECTION");
+			//Add log			
+			if ReceivedCollections::<T, I>::contains_key(&origin_collection){
+				Self::deposit_event(Event::CollectionAlreadyReceived {
+					origin_collection_id: origin_collection.clone(),
+					to_address: receiving_account.clone(),
+				});
+			}
+			//Create collection
+			match pallet_nfts::Pallet::<T, I>::create(
+				origin.clone(),
+				receiving_account.clone(),
+				config.clone()
+			) {
+				Ok(collection) => {
+					let received = ReceivedCols::<T, I> {
+						origin_para_id: origin_para.clone(),
+						origin_collection_id: origin_collection.clone(),
+						received_collection_id: origin_collection.clone(),
+					};
+		
+					// Add to received collections
+					ReceivedCollections::<T, I>::insert(origin_collection.clone(), received);
+		
+					// Emit event
+					Self::deposit_event(Event::CollectionReceived {
+						origin_collection_id: origin_collection.clone(),
+						received_collection_id: origin_collection.clone(),
+						to_address: receiving_account,
+					});
+				},
+				Err(e) => {
+					// Deposit event indicating failure to create collection
+					Self::deposit_event(Event::CollectionCreationFailed {
+						owner: receiving_account.clone(),
+						error: e,
+					});
+				}
+			}
+
+			Ok(().into())
+		}
 	}
 }
+
