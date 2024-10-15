@@ -76,6 +76,11 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		Collection::<T, I>::get(collection).map(|i| i.owner_deposit)
 	}
 
+	/// Returns collection data
+	pub fn collection_data(collection: T::CollectionId) -> Option<BoundedVec<u8, <T as Config<I>>::StringLimit>> {
+		CollectionMetadataOf::<T, I>::get(collection).map(|i| i.data)
+	}
+
 	/// Returns item data
 	pub fn item_data(collection: T::CollectionId, item: T::ItemId) -> Option<BoundedVec<u8, <T as Config<I>>::StringLimit>> {
 		ItemMetadataOf::<T, I>::get(collection, item).map(|i| i.data)
