@@ -491,6 +491,19 @@ use frame_system::pallet_prelude::*;
 			items: Vec<(T::ItemId, BoundedVec<u8, T::StringLimit>)>,
 		},
 
+		CollectionWithNftsDiffOwnersReceived {
+			collection_id: T::CollectionId,
+			items: Vec<(T::ItemId, AccountIdLookupOf<T>, BoundedVec<u8, T::StringLimit>)>,
+		},
+
+		/// Event emitted when a collection and its NFTs are transferred cross-chain
+		CollectionAndNFTsDiffTransferred {
+			origin_collection_id: T::CollectionId,
+			nfts: Vec<(T::ItemId,AccountIdLookupOf<T>, BoundedVec<u8, T::StringLimit>)>,
+			destination_para_id: ParachainID,
+			to_address: AccountIdLookupOf<T>,
+		},
+
 	}
 
 	/// <https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html#event-and-error>
@@ -549,6 +562,8 @@ use frame_system::pallet_prelude::*;
 				items.push(item_id);
 			}
 
+			//ADD COLLECTION METADATA TRANSFER
+			
 			///Check if the collection is empty (items array is empty)
 			if items.is_empty() {
 				//Transfer the collection to the destination parachain
@@ -880,10 +895,11 @@ use frame_system::pallet_prelude::*;
 				// (Implementation for transfer goes here)
 
 				//Get the collection metadata
-				let collection_metadata;
+				let mut collection_metadata = Some(BoundedVec::new());
 				if pallet_nfts::CollectionMetadataOf::<T, I>::contains_key(proposal.collection_id.clone()){
-					collection_metadata = pallet_nfts::CollectionMetadataOf::<T, I>::get(proposal.collection_id.clone()).unwrap();
+					collection_metadata = pallet_nfts::Pallet::<T, I>::collection_data(proposal.collection_id.clone());
 				}
+
 				//Get NFT metadata
 				let mut nft_metadata = Vec::new();
 				
@@ -904,13 +920,16 @@ use frame_system::pallet_prelude::*;
 					Self::collection_x_transfer(origin, proposal.collection_id, proposal.proposed_destination_para, T::Lookup::unlookup(proposal.proposed_collection_owner.clone()), proposal.proposed_destination_config.clone())?;
 				}
 
+
 				for item_id in items.clone() {
+					let nft_owner = pallet_nfts::Pallet::<T, I>::owner(proposal.collection_id.clone(), item_id).unwrap();
+					let unlooked_recipient = T::Lookup::unlookup(nft_owner.clone());
 					if pallet_nfts::ItemMetadataOf::<T, I>::contains_key(proposal.collection_id.clone(), item_id) {
-						if let Some(nft_owner) = pallet_nfts::Pallet::<T, I>::owner(proposal.collection_id, item_id) {
-							let item_details = pallet_nfts::ItemMetadataOf::<T, I>::get(proposal.collection_id.clone(), item_id).unwrap();
-							let unlookup_owner = T::Lookup::unlookup(nft_owner.clone());
-							nft_metadata.push((item_id, unlookup_owner.clone(), item_details));
-						}
+						let item_details = pallet_nfts::Pallet::<T, I>::item_data(proposal.collection_id.clone(), item_id).unwrap();
+						nft_metadata.push((item_id,unlooked_recipient.clone(), item_details));
+					}else{
+						//Add empty metadata
+						nft_metadata.push((item_id, unlooked_recipient.clone(), BoundedVec::new()));
 					}
 				}
 
@@ -927,12 +946,16 @@ use frame_system::pallet_prelude::*;
 						Transact {
 							origin_kind: OriginKind::SovereignAccount,
 							require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
-							call: <T as Config<I>>::RuntimeCall::from(pallet_nfts::Call::<
+							call: <T as Config<I>>::XcNftCall::from(Call::<
 								T,
-								I,
-							>::create {
-								admin: unlooked_recipient.clone(),
+								I, 
+							>::parse_collection_diff_owners {
+								owner: unlooked_recipient.clone(),
 								config,
+								origin_collection_id: proposal.collection_id.clone(),
+								origin_para: parachain_info::Pallet::<T>::parachain_id(),
+								collection_metadata: collection_metadata.unwrap(),
+								nfts: nft_metadata.clone(),
 							})
 							.encode()
 							.into(),
@@ -958,6 +981,7 @@ use frame_system::pallet_prelude::*;
 							//Remove nft from associated account
 							//Get NFT owner
 							let nft_owner = pallet_nfts::Pallet::<T, I>::owner(proposal.collection_id.clone(), item_id).unwrap();
+
 							pallet_nfts::Account::<T, I>::remove((nft_owner.clone(), proposal.collection_id.clone(), item_id));
 
 							// Remove the NFT item from storage
@@ -1005,9 +1029,9 @@ use frame_system::pallet_prelude::*;
 
 
 						// Emit an event.
-						Self::deposit_event(Event::CollectionAndNFTsTransferred {
+						Self::deposit_event(Event::CollectionAndNFTsDiffTransferred {
 							origin_collection_id: proposal.collection_id.clone(),
-							nft_ids: items.clone(),
+							nfts: nft_metadata.clone(),
 							destination_para_id: proposal.proposed_destination_para.clone(),
 							to_address: unlooked_recipient.clone(),
 						});
@@ -1567,16 +1591,13 @@ use frame_system::pallet_prelude::*;
 		#[pallet::call_index(13)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn parse_collection_metadata(origin: OriginFor<T>, owner: AccountIdLookupOf<T> , collection: T::CollectionId, data: BoundedVec<u8, T::StringLimit>) -> DispatchResultWithPostInfo {
-			
-			//Receiving account to account id
-			let receiving_account_id = T::Lookup::lookup(owner.clone())
-			.map_err(|_| Error::<T, I>::AccountLookupFailed)?;
-	
+			let signed_origin = ensure_signed(origin.clone())?;
+			log::info!("Signed Origin: {:?}", signed_origin);
+
 			// Convert AccountId to Signed Origin
-			let signed_origin: OriginFor<T> = system::RawOrigin::Signed(receiving_account_id.clone()).into();
 
 			//Set the collection metadata
-			match pallet_nfts::Pallet::<T, I>::set_collection_metadata(signed_origin.clone(), collection.clone(), data.clone()) {
+			match pallet_nfts::Pallet::<T, I>::set_collection_metadata(origin.clone(), collection.clone(), data.clone()) {
 				Ok(_) => {
 				},
 				Err(e) => {
@@ -1707,6 +1728,7 @@ use frame_system::pallet_prelude::*;
 			Ok(().into())
 		}
 	
+		//NEEDS FIXING
 		#[pallet::call_index(18)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn parse_nft_transfer( origin: OriginFor<T>, owner: AccountIdLookupOf<T>, collection: T::CollectionId, item: T::ItemId, data: BoundedVec<u8, T::StringLimit>, mint_to: AccountIdLookupOf<T>, origin_collection: T::CollectionId, origin_item: T::ItemId, origin_chain: ParaId) -> DispatchResultWithPostInfo {
@@ -1739,6 +1761,8 @@ use frame_system::pallet_prelude::*;
 
 			let sent_exists = SentAssets::<T, I>::contains_key(&(collection.clone(), item.clone()));
 			if sent_exists {
+				//User has no permission to claim the NFT
+
 				//This means, that this is the NFT origin chain, we also check if ParaId matches
 					// Retrieve the sent asset and store it in a variable
 					let sent_asset = SentAssets::<T, I>::get(&(collection.clone(), item.clone()));
@@ -1964,9 +1988,115 @@ use frame_system::pallet_prelude::*;
 	
 		#[pallet::call_index(20)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn parse_collection_multiple_owners( origin: OriginFor<T>, owner: AccountIdLookupOf<T>, config: CollectionConfigFor<T, I>, collection_metadata: BoundedVec<u8, T::StringLimit> ,nfts: Vec<(T::ItemId, AccountIdLookupOf<T> ,BoundedVec<u8, T::StringLimit>)>, origin_para: ParaId, origin_collection_id: T::CollectionId) -> DispatchResultWithPostInfo {
-			Ok(().into())
+		pub fn parse_collection_diff_owners( origin: OriginFor<T>, owner: AccountIdLookupOf<T>, config: CollectionConfigFor<T, I>, collection_metadata: BoundedVec<u8, T::StringLimit> ,nfts: Vec<(T::ItemId, AccountIdLookupOf<T> ,BoundedVec<u8, T::StringLimit>)>, origin_para: ParaId, origin_collection_id: T::CollectionId) -> DispatchResultWithPostInfo {
+			//Convert accountidlookupof to accountid
+			let who = T::Lookup::lookup(owner.clone())?;
 
+			// Convert AccountId to Signed Origin
+			let signed_origin: OriginFor<T> = system::RawOrigin::Signed(who.clone()).into();
+
+			//Get next collection id
+			let mut next_collection_id = pallet_nfts::NextCollectionId::<T, I>::get()
+			.or(T::CollectionId::initial_value()).unwrap();
+
+			let collection = pallet_nfts::Pallet::<T, I>::create(
+				signed_origin.clone(),
+				owner.clone(),
+				config.clone()
+			)?;		
+
+			let mut user_collection = next_collection_id.clone();
+			//just to be sure, check if user is collection owner
+			let col_owner = pallet_nfts::Pallet::<T, I>::collection_owner(next_collection_id.clone());
+			if col_owner.unwrap()!=who.clone(){
+				//Get current next_collection_id
+				let current_next_collection_id = pallet_nfts::NextCollectionId::<T, I>::get().ok_or(Error::<T, I>::NoNextCollectionId)?;
+				//Go from next_collection_id to current_next_collection_id and try to find the collection that is owned by the user
+				while next_collection_id!=current_next_collection_id{
+					let col_owner = pallet_nfts::Pallet::<T, I>::collection_owner(next_collection_id);
+					if col_owner.unwrap()==who.clone(){
+						//We have users collection
+						user_collection = next_collection_id.clone();
+						break;
+					}
+					next_collection_id = next_collection_id.increment().ok_or(Error::<T, I>::NoNextCollectionId)?;
+				}
+			}
+
+			//Set the collection metadata if present
+			if !collection_metadata.is_empty(){
+				match pallet_nfts::Pallet::<T, I>::set_collection_metadata(signed_origin.clone(), user_collection.clone(), collection_metadata.clone()) {
+					Ok(_) => {
+					},
+					Err(e) => {
+						// Deposit event indicating failure to set metadata
+						Self::deposit_event(Event::CollectionMetadataSetFailed {
+							collection_id: user_collection.clone(),
+							owner: owner.clone(),
+							error: e,
+						});
+					}
+				}
+			}
+			//Mint the NFTs
+			//Iterate through vector of nfts
+			for nft in nfts.clone() {
+				let item = nft.0;
+				let nft_owner = nft.1;
+				let data = nft.2;
+
+				//Mint the NFT
+				match pallet_nfts::Pallet::<T, I>::mint(signed_origin.clone(), user_collection.clone(), item.clone(), nft_owner.clone(), None) {
+					Ok(_) => {
+					},
+					Err(e) => {
+						// Deposit event indicating failure to mint NFT
+						Self::deposit_event(Event::NFTMintFailed {
+							collection_id: user_collection.clone(),
+							asset_id: item.clone(),
+							owner: nft_owner.clone(),
+							error: e,
+						});
+					}
+				}
+				//If empty metadata, skip
+				if !data.is_empty(){
+					match pallet_nfts::Pallet::<T, I>::set_metadata(signed_origin.clone(), user_collection.clone(), item.clone(), data.clone()) {
+						Ok(_) => {
+						},
+						Err(e) => {
+							// Deposit event indicating failure to set metadata
+							Self::deposit_event(Event::NFTMetadataSetFailed {
+								collection_id: user_collection.clone(),
+								asset_id: item.clone(),
+								owner: nft_owner.clone(),
+								error: e,
+							});
+						}
+					}
+				}
+
+				//Check if the NFT was minted if storage contains the item
+				let item_exists = pallet_nfts::Item::<T, I>::contains_key(&user_collection, &item);
+				ensure!(item_exists, Error::<T, I>::NFTDoesNotExist);
+				
+			}
+
+			//Add collection to received collections
+			ReceivedCollections::<T, I>::insert(user_collection.clone(), ReceivedCols {
+				origin_para_id: origin_para.clone(),
+				origin_collection_id: origin_collection_id.clone(),
+				received_collection_id: user_collection.clone(),
+			});
+			
+			//If all went up to this point, emit event about successful cross-chain operation
+			Self::deposit_event(Event::CollectionWithNftsDiffOwnersReceived {
+				collection_id: user_collection.clone(),
+				items: nfts.clone(),
+			});
+
+			
+			Ok(().into())
 		}
 	}
 }
