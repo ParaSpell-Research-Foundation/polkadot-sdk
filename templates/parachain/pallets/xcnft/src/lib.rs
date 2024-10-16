@@ -572,7 +572,7 @@ use frame_system::pallet_prelude::*;
 					Xcm(vec![
 						UnpaidExecution { weight_limit: Unlimited, check_origin: None },
 						Transact {
-							origin_kind: OriginKind::SovereignAccount,
+							origin_kind: OriginKind::Native,
 							require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
 							call: <T as Config<I>>::XcNftCall::from(Call::<
 								T,
@@ -593,9 +593,8 @@ use frame_system::pallet_prelude::*;
 						if ReceivedCollections::<T, I>::contains_key(&origin_collection) {
 							ReceivedCollections::<T, I>::remove(&origin_collection);
 						}
-
-						//Burning the collection
-						if let Some(col_deposit) = pallet_nfts::Pallet::<T, I>::deposit(origin_collection) {
+						
+						if let Some(col_deposit) = pallet_nfts::Collection::<T, I>::get(origin_collection).map(|i| i.owner_deposit) {
 							T::Currency::unreserve(&who.clone(), col_deposit);
 						}
 
@@ -705,7 +704,7 @@ use frame_system::pallet_prelude::*;
 				//First check if collection contains any metadata
 				let mut collection_metadata = None;
 				if pallet_nfts::CollectionMetadataOf::<T, I>::contains_key(&origin_collection){
-					collection_metadata = pallet_nfts::Pallet::<T, I>::collection_data(origin_collection);
+					collection_metadata = Some(pallet_nfts::CollectionMetadataOf::<T, I>::get(origin_collection).unwrap().data);
 				}
 
 				if collection_metadata.is_none() {
@@ -716,7 +715,7 @@ use frame_system::pallet_prelude::*;
 				let mut nft_metadata = Vec::new();
 				for item_id in items.clone() {
 					if pallet_nfts::ItemMetadataOf::<T, I>::contains_key(&origin_collection, item_id) {
-						let item_details = pallet_nfts::Pallet::<T, I>::item_data(origin_collection, item_id).unwrap();
+						let item_details = pallet_nfts::ItemMetadataOf::<T, I>::get(origin_collection, item_id).unwrap().data;
 						nft_metadata.push((item_id,item_details));
 					}else{
 						//Add empty metadata
@@ -759,7 +758,7 @@ use frame_system::pallet_prelude::*;
 							let _ = pallet_nfts::Pallet::<T, I>::burn(origin.clone(), origin_collection.clone(), item_id);
 						}
 						//Burning the collection
-						if let Some(col_deposit) = pallet_nfts::Pallet::<T, I>::deposit(origin_collection) {
+						if let col_deposit = pallet_nfts::Collection::<T, I>::get(origin_collection).unwrap().owner_deposit {
 							T::Currency::unreserve(&who.clone(), col_deposit);
 						}
 
@@ -897,7 +896,7 @@ use frame_system::pallet_prelude::*;
 				//Get the collection metadata
 				let mut collection_metadata = Some(BoundedVec::new());
 				if pallet_nfts::CollectionMetadataOf::<T, I>::contains_key(proposal.collection_id.clone()){
-					collection_metadata = pallet_nfts::Pallet::<T, I>::collection_data(proposal.collection_id.clone());
+					collection_metadata = Some(pallet_nfts::CollectionMetadataOf::<T, I>::get(proposal.collection_id.clone()).unwrap().data);
 				}
 
 				//Get NFT metadata
@@ -925,7 +924,7 @@ use frame_system::pallet_prelude::*;
 					let nft_owner = pallet_nfts::Pallet::<T, I>::owner(proposal.collection_id.clone(), item_id).unwrap();
 					let unlooked_recipient = T::Lookup::unlookup(nft_owner.clone());
 					if pallet_nfts::ItemMetadataOf::<T, I>::contains_key(proposal.collection_id.clone(), item_id) {
-						let item_details = pallet_nfts::Pallet::<T, I>::item_data(proposal.collection_id.clone(), item_id).unwrap();
+						let item_details = pallet_nfts::ItemMetadataOf::<T, I>::get(proposal.collection_id.clone(), item_id).unwrap().data;
 						nft_metadata.push((item_id,unlooked_recipient.clone(), item_details));
 					}else{
 						//Add empty metadata
@@ -972,8 +971,8 @@ use frame_system::pallet_prelude::*;
 						for item_id in items.clone() {
 
 							//Unreserve the funds of person who created NFT
-							if let Some(depositor_account) = pallet_nfts::Pallet::<T, I>::item_depositor(proposal.collection_id.clone(), item_id) {
-								if let Some(deposit_amount) = pallet_nfts::Pallet::<T, I>::item_deposit(proposal.collection_id.clone(), item_id) {
+							if let Some(depositor_account) = pallet_nfts::Item::<T, I>::get(proposal.collection_id.clone(), item_id).map(|i| i.deposit.account) {
+								if let Some(deposit_amount) = pallet_nfts::Item::<T, I>::get(proposal.collection_id.clone(), item_id).map(|i| i.deposit.amount) {
 									T::Currency::unreserve(&depositor_account, deposit_amount);
 								} 
 							}
@@ -1008,7 +1007,7 @@ use frame_system::pallet_prelude::*;
 						//Retrieve the collection details
 		
 						// Unreserve the funds
-						if let Some(col_deposit) = pallet_nfts::Pallet::<T, I>::deposit(proposal.collection_id.clone()) {
+						if let Some(col_deposit) = pallet_nfts::Collection::<T, I>::get(proposal.collection_id.clone()).map(|i| i.owner_deposit) {
 							T::Currency::unreserve(&who.clone(), col_deposit);
 						}
 
@@ -1068,7 +1067,7 @@ use frame_system::pallet_prelude::*;
 			let mut metadata = None;
 			//Get Item data
 			if pallet_nfts::ItemMetadataOf::<T, I>::contains_key(&origin_collection, &origin_asset) {
-				metadata = pallet_nfts::Pallet::<T, I>::item_data(origin_collection.clone(), origin_asset.clone());
+				metadata = pallet_nfts::ItemMetadataOf::<T, I>::get(origin_collection.clone(), origin_asset.clone()).map(|i| i.data);
 			}
 			else {
 				metadata = Some(BoundedVec::new());
@@ -1206,7 +1205,7 @@ use frame_system::pallet_prelude::*;
 			//Get the asset metadata
 			let mut metadata = None;
 			if pallet_nfts::ItemMetadataOf::<T, I>::contains_key(current_collection.clone(), current_asset.clone()) {
-				metadata = pallet_nfts::Pallet::<T, I>::item_data(current_collection.clone(), current_asset.clone());
+				metadata = pallet_nfts::ItemMetadataOf::<T, I>::get(current_collection.clone(), current_asset.clone()).map(|i| i.data);
 			}
 			else{
 				metadata = Some(BoundedVec::new());
