@@ -108,7 +108,6 @@ pub type Barrier = TrailingSetTopicAsId<
 		),
 	>,
 >;
-
 pub struct XcmConfig;
 impl xcm_executor::Config for XcmConfig {
 	type RuntimeCall = RuntimeCall;
@@ -136,7 +135,7 @@ impl xcm_executor::Config for XcmConfig {
 	type UniversalAliases = Nothing;
 	type CallDispatcher = WithOriginFilter<Self::SafeCallFilter>;
 	type SafeCallFilter = Everything;
-	type Aliasers = Nothing;
+	type Aliasers = Everything;
 	type TransactionalProcessor = FrameTransactionalProcessor;
 	type HrmpNewChannelOpenRequestHandler = ();
 	type HrmpChannelAcceptedHandler = ();
