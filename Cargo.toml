@@ -539,6 +539,10 @@ members = [
 	"templates/parachain/pallets/template",
 	"templates/parachain/pallets/xcnft",
 	"templates/parachain/runtime",
+	"templates/parachain_two/node",
+	"templates/parachain_two/pallets/template",
+	"templates/parachain_two/pallets/xcnft",
+	"templates/parachain_two/runtime",
 	"templates/solochain/node",
 	"templates/solochain/pallets/template",
 	"templates/solochain/runtime",
@@ -959,6 +963,8 @@ pallet-offences-benchmarking = { path = "substrate/frame/offences/benchmarking",
 pallet-paged-list = { path = "substrate/frame/paged-list", default-features = false }
 pallet-parachain-template = { path = "templates/parachain/pallets/template", default-features = false }
 pallet-parachain-xcnft = { path = "templates/parachain/pallets/xcnft", default-features = false }
+pallet-parachain-template-two = {path = "templates/parachain_two/pallets/template", default-features = false }
+pallet-parachain-xcnft-two = { path = "templates/parachain_two/pallets/xcnft", default-features = false }
 pallet-parameters = { path = "substrate/frame/parameters", default-features = false }
 pallet-preimage = { path = "substrate/frame/preimage", default-features = false }
 pallet-proxy = { path = "substrate/frame/proxy", default-features = false }
@@ -1008,6 +1014,7 @@ pallet-xcm-bridge-hub = { path = "bridges/modules/xcm-bridge-hub", default-featu
 pallet-xcm-bridge-hub-router = { path = "bridges/modules/xcm-bridge-hub-router", default-features = false }
 parachain-info = { path = "cumulus/parachains/pallets/parachain-info", default-features = false, package = "staging-parachain-info" }
 parachain-template-runtime = { path = "templates/parachain/runtime" }
+parachain-template-runtime-two = { path = "templates/parachain_two/runtime"}
 parachains-common = { path = "cumulus/parachains/common", default-features = false }
 parachains-relay = { path = "bridges/relays/parachains" }
 parachains-runtimes-test-utils = { path = "cumulus/parachains/runtimes/test-utils", default-features = false }
