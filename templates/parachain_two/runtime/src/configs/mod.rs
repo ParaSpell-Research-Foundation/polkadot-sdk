@@ -24,7 +24,7 @@
 // For more information, please refer to <http://unlicense.org>
 
 mod xcm_config;
-pub use pallet_parachain_xcnft;
+pub use pallet_parachain_xcnft_two;
 pub use pallet_uniques;
 
 use pallet_nfts::{AttributeNamespace, Call as NftsCall};
@@ -318,14 +318,14 @@ impl pallet_collator_selection::Config for Runtime {
 }
 
 /// Configure the pallet template in pallets/template.
-impl pallet_parachain_template::Config for Runtime {
+impl pallet_parachain_template_two::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_parachain_template::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = pallet_parachain_template_two::weights::SubstrateWeight<Runtime>;
 }
 
-impl pallet_parachain_xcnft::Config for Runtime {
+impl pallet_parachain_xcnft_two::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_parachain_xcnft::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = pallet_parachain_xcnft_two::weights::SubstrateWeight<Runtime>;
 	type XcmSender = xcm_config::XcmRouter;
 	type RuntimeCall = RuntimeCall;
 	type ProposalTimeInBlocks = proposal_time_in_blocks_parameter;
@@ -354,8 +354,8 @@ parameter_types! {
 
 impl pallet_uniques::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type CollectionId = u128;
-	type ItemId = u128;
+	type CollectionId = u32;
+	type ItemId = u32;
 	type Currency = Balances;
 	type ForceOrigin = EnsureRoot<AccountId>;
 	type CreateOrigin = EnsureSigned<AccountId>;
