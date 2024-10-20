@@ -1967,6 +1967,8 @@ pub mod pallet {
 				},
 			}
 
+			//// NEEDS FIXING! WE DO NOT KNOW COLLECTION ID ////
+
 			// Set the collection metadata if not empty
 			if !collection_metadata.is_empty() {
 				match pallet_nfts::Pallet::<T, I>::set_collection_metadata(
@@ -2289,14 +2291,14 @@ pub mod pallet {
 
 			// Check if the owner owns the collection
 			ensure!(
-				pallet_nfts::Pallet::<T, I>::collection_owner(collection).unwrap() ==
+				pallet_nfts::Pallet::<T, I>::collection_owner(collection.clone()).unwrap() ==
 					signed_origin.clone(),
 				Error::<T, I>::NotCollectionOwner
 			);
 
 			// Check if the item exists
 			ensure!(
-				!pallet_nfts::Item::<T, I>::contains_key(&collection, &item),
+				!pallet_nfts::Item::<T, I>::contains_key(&collection.clone(), &item),
 				Error::<T, I>::NFTExists
 			);
 

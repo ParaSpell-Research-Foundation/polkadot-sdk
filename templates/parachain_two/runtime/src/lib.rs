@@ -13,7 +13,7 @@ pub mod configs;
 mod genesis_config_presets;
 mod weights;
 
-pub use pallet_parachain_xcnft;
+pub use pallet_parachain_xcnft_two;
 
 extern crate alloc;
 use alloc::vec::Vec;
@@ -309,10 +309,10 @@ mod runtime {
 	pub type MessageQueue = pallet_message_queue;
 
 	#[runtime::pallet_index(50)]
-	pub type XcnftModule = pallet_parachain_xcnft;
+	pub type XcnftModule = pallet_parachain_xcnft_two;
 
 	#[runtime::pallet_index(51)]
-	pub type TemplatePallet = pallet_parachain_template;
+	pub type TemplatePallet = pallet_parachain_template_two;
 
 	#[runtime::pallet_index(52)]
 	pub type UniquesModule = pallet_uniques;
