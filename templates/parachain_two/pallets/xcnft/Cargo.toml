@@ -24,6 +24,7 @@ scale-info = { features = [
 frame-benchmarking = { optional = true, workspace = true }
 frame-support = { workspace = true }
 frame-system = { workspace = true }
+enumflags2 = { workspace = true }
 
 #XCM
 xcm = { workspace = true}
