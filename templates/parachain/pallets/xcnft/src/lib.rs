@@ -81,7 +81,7 @@ pub mod pallet {
 		traits::Incrementable,
 	};
 	use frame_system::pallet_prelude::*;
-	use pallet_nfts::{CollectionConfigFor, DestroyWitness};
+	use pallet_nfts::{CollectionConfigFor, CollectionConfigOf, DestroyWitness};
 	use scale_info::prelude::vec;
 	use sp_runtime::{traits::StaticLookup, DispatchError, DispatchErrorWithPostInfo};
 	use sp_std::prelude::*;
@@ -143,7 +143,8 @@ pub mod pallet {
 		collection_id: T::CollectionId,
 		proposed_collection_owner: T::AccountId,
 		proposed_destination_para: ParaId,
-		proposed_destination_config: CollectionConfigFor<T, I>,
+		proposed_dest_collection_id: Option<T::CollectionId>,
+		proposed_destination_config: Option<CollectionConfigFor<T, I>>,
 		owners: BoundedVec<T::AccountId, T::MaxOwners>,
 		number_of_votes: Votes<T, I>,
 		end_time: BlockNumberFor<T>,
@@ -568,8 +569,9 @@ pub mod pallet {
 		pub fn collection_x_transfer(
 			origin: OriginFor<T>,
 			origin_collection: T::CollectionId,
+			destination_collection: Option<T::CollectionId>,
 			destination_para: ParaId,
-			config: CollectionConfigFor<T, I>,
+			config: Option<CollectionConfigFor<T, I>>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin.clone())?;
 
@@ -632,6 +634,7 @@ pub mod pallet {
 							call: <T as Config<I>>::RuntimeCall::from(
 								Call::<T, I>::parse_collection_empty {
 									origin_collection: origin_collection.clone(),
+									destination_collection,
 									collection_metadata: collection_metadata.clone().unwrap(),
 									config,
 								},
@@ -731,6 +734,7 @@ pub mod pallet {
 								collection_id: origin_collection,
 								proposed_collection_owner: who.clone(),
 								proposed_destination_config: config,
+								proposed_dest_collection_id: destination_collection,
 								proposed_destination_para: destination_para,
 								owners: different_owners,
 								number_of_votes: Votes {
@@ -1069,6 +1073,7 @@ pub mod pallet {
 					Self::collection_x_transfer(
 						origin.clone(),
 						proposal.collection_id,
+						proposal.proposed_dest_collection_id,
 						proposal.proposed_destination_para,
 						proposal.proposed_destination_config.clone(),
 					)?;
@@ -1945,8 +1950,9 @@ pub mod pallet {
 		pub fn parse_collection_empty(
 			origin: OriginFor<T>,
 			origin_collection: T::CollectionId,
+			destination_collection: Option<T::CollectionId>,
 			collection_metadata: BoundedVec<u8, T::StringLimit>,
-			config: CollectionConfigFor<T, I>,
+			config: Option<CollectionConfigFor<T, I>>,
 		) -> DispatchResultWithPostInfo {
 			let signed_origin = ensure_signed(origin.clone())?;
 			let signed_origin_lookup = T::Lookup::unlookup(signed_origin.clone());
@@ -1955,7 +1961,7 @@ pub mod pallet {
 			match pallet_nfts::Pallet::<T, I>::create(
 				origin.clone(),
 				signed_origin_lookup.clone(),
-				config.clone(),
+				config.clone().unwrap(),
 			) {
 				Ok(_) => {},
 				Err(e) => {
@@ -2382,7 +2388,7 @@ pub mod pallet {
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn parse_collection_same_owner(
 			origin: OriginFor<T>,
-			config: CollectionConfigFor<T, I>,
+			config: Option<CollectionConfigFor<T, I>>,
 			collection_metadata: BoundedVec<u8, T::StringLimit>,
 			nfts: Vec<(T::ItemId, BoundedVec<u8, T::StringLimit>)>,
 			origin_para: ParaId,
@@ -2399,7 +2405,7 @@ pub mod pallet {
 			match pallet_nfts::Pallet::<T, I>::create(
 				origin.clone(),
 				signed_origin_lookup.clone(),
-				config.clone(),
+				config.clone().unwrap(),
 			) {
 				Ok(_) => {},
 				Err(e) => {
@@ -2533,7 +2539,7 @@ pub mod pallet {
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn parse_collection_diff_owners(
 			origin: OriginFor<T>,
-			config: CollectionConfigFor<T, I>,
+			config: Option<CollectionConfigFor<T, I>>,
 			collection_metadata: BoundedVec<u8, T::StringLimit>,
 			nfts: Vec<(T::ItemId, AccountIdLookupOf<T>, BoundedVec<u8, T::StringLimit>)>,
 			origin_para: ParaId,
@@ -2547,10 +2553,15 @@ pub mod pallet {
 				.or(T::CollectionId::initial_value())
 				.unwrap();
 
+			// Check if config is present
+			if config.is_none() {
+				// Create new configfor collection
+			}
+
 			match pallet_nfts::Pallet::<T, I>::create(
 				origin.clone(),
 				signed_origin_lookup.clone(),
-				config.clone(),
+				config.clone().unwrap(),
 			) {
 				Ok(_) => {},
 				Err(e) => {

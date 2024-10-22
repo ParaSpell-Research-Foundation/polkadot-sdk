@@ -70,6 +70,8 @@ pub mod weights;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+pub mod xmacros;
+
 #[frame_support::pallet]
 pub mod pallet {
 
@@ -78,14 +80,18 @@ pub mod pallet {
 	use frame_support::{
 		dispatch::{DispatchResultWithPostInfo, PostDispatchInfo},
 		pallet_prelude::*,
-		traits::Incrementable,
 	};
+	use scale_info::{build::Fields, meta_type, Path, Type, TypeInfo, TypeParameter};
+	use codec::EncodeLike;
+
+	use crate::xmacros::impl_codec_bitflags;
 	use frame_system::pallet_prelude::*;
 	use pallet_uniques::DestroyWitness;
 	use scale_info::prelude::vec;
 	use sp_runtime::{traits::StaticLookup, DispatchError, DispatchErrorWithPostInfo};
 	use sp_std::prelude::*;
 	use xcm::latest::prelude::*;
+	use enumflags2::{bitflags, BitFlags};
 
 	type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
@@ -116,6 +122,134 @@ pub mod pallet {
 	#[pallet::pallet]
 	pub struct Pallet<T, I = ()>(PhantomData<(T, I)>);
 
+	/// Create struct for collection config, in case, that the message comes from nfts chain
+	#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Clone, PartialEq, Default, Debug)]
+	#[scale_info(skip_type_params(T))]
+	pub struct CollectionConfig<Price, BlockNumber, CollectionId> {
+		/// Collection's settings.
+		pub settings: CollectionSettings,
+		/// Collection's max supply.
+		pub max_supply: Option<u32>,
+		/// Default settings each item will get during the mint.
+		pub mint_settings: MintSettings<Price, BlockNumber,CollectionId>,
+	}
+
+	/// Mimic collection config for of nfts pallet
+	pub type CollectionConfigFor<T, I = (), CollectionId = ()> =
+    CollectionConfig<BalanceOf<T, I>, BlockNumberFor<T>, CollectionId>;
+
+	#[derive(Clone, Copy, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+	pub enum MintType<CollectionId> {
+		/// Only an `Issuer` could mint items.
+		Issuer,
+		/// Anyone could mint items.
+		Public,
+		/// Only holders of items in specified collection could mint new items.
+		HolderOf(CollectionId),
+	}
+
+	use frame_support::traits::Currency;
+
+	pub type BalanceOf<T, I = ()> =
+	<<T as pallet_uniques::Config<I>>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+
+	/// Mimic collection settings of nfts pallet
+	#[derive(Clone, Copy, PartialEq, Eq, Default, RuntimeDebug)]
+	pub struct CollectionSettings(pub BitFlags<CollectionSetting>);
+
+	impl CollectionSettings {
+		pub fn all_enabled() -> Self {
+			Self(BitFlags::EMPTY)
+		}
+		pub fn get_disabled(&self) -> BitFlags<CollectionSetting> {
+			self.0
+		}
+		pub fn is_disabled(&self, setting: CollectionSetting) -> bool {
+			self.0.contains(setting)
+		}
+		pub fn from_disabled(settings: BitFlags<CollectionSetting>) -> Self {
+			Self(settings)
+		}
+	}
+
+	#[bitflags]
+	#[repr(u64)]
+	#[derive(Copy, Clone, RuntimeDebug, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo)]
+	pub enum CollectionSetting {
+		/// Items in this collection are transferable.
+		TransferableItems,
+		/// The metadata of this collection can be modified.
+		UnlockedMetadata,
+		/// Attributes of this collection can be modified.
+		UnlockedAttributes,
+		/// The supply of this collection can be modified.
+		UnlockedMaxSupply,
+		/// When this isn't set then the deposit is required to hold the items of this collection.
+		DepositRequired,
+	}
+		
+	impl_codec_bitflags!(CollectionSettings, u64, CollectionSetting);
+
+	#[derive(Clone, Copy, PartialEq, Eq, Default, RuntimeDebug)]
+	pub struct ItemSettings(pub BitFlags<ItemSetting>);
+	
+	impl ItemSettings {
+		pub fn all_enabled() -> Self {
+			Self(BitFlags::EMPTY)
+		}
+		pub fn get_disabled(&self) -> BitFlags<ItemSetting> {
+			self.0
+		}
+		pub fn is_disabled(&self, setting: ItemSetting) -> bool {
+			self.0.contains(setting)
+		}
+		pub fn from_disabled(settings: BitFlags<ItemSetting>) -> Self {
+			Self(settings)
+		}
+	}
+
+	#[bitflags]
+	#[repr(u64)]
+	#[derive(Copy, Clone, RuntimeDebug, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo)]
+	pub enum ItemSetting {
+		/// This item is transferable.
+		Transferable,
+		/// The metadata of this item can be modified.
+		UnlockedMetadata,
+		/// Attributes of this item can be modified.
+		UnlockedAttributes,
+	}
+	
+	impl_codec_bitflags!(ItemSettings, u64, ItemSetting);
+	
+
+	/// Holds the information about minting.
+	#[derive(Clone, Copy, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+	pub struct MintSettings<Price, BlockNumber, CollectionId> {
+		/// Whether anyone can mint or if minters are restricted to some subset.
+		pub mint_type: MintType<CollectionId>,
+		/// An optional price per mint.
+		pub price: Option<Price>,
+		/// When the mint starts.
+		pub start_block: Option<BlockNumber>,
+		/// When the mint ends.
+		pub end_block: Option<BlockNumber>,
+		/// Default settings each item will get during the mint.
+		pub default_item_settings: ItemSettings,
+	}
+
+	impl<Price, BlockNumber, CollectionId> Default for MintSettings<Price, BlockNumber, CollectionId> {
+		fn default() -> Self {
+			Self {
+				mint_type: MintType::Issuer,
+				price: None,
+				start_block: None,
+				end_block: None,
+				default_item_settings: ItemSettings::all_enabled(),
+			}
+		}
+	}
+
 	/// Enum for voting, either Aye or Nay option.
 	#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Clone, PartialEq, Default, Debug)]
 	#[scale_info(skip_type_params(T))]
@@ -143,7 +277,8 @@ pub mod pallet {
 		collection_id: T::CollectionId,
 		proposed_collection_owner: T::AccountId,
 		proposed_destination_para: ParaId,
-		proposed_dest_collection_id: T::CollectionId,
+		proposed_dest_collection_id: Option<T::CollectionId>,
+		proposed_destination_config: Option<CollectionConfigFor<T, I>>,
 		owners: BoundedVec<T::AccountId, T::MaxOwners>,
 		number_of_votes: Votes<T, I>,
 		end_time: BlockNumberFor<T>,
@@ -493,6 +628,8 @@ pub mod pallet {
 
 		/// Event emitted when collection fails to mint on destination chain
 		CollectionMintFailed { error: DispatchError },
+
+		CollectionListFull { owner: AccountIdLookupOf<T> },
 	}
 
 	#[pallet::error]
@@ -546,6 +683,8 @@ pub mod pallet {
 
 		/// Error returned when user enters wrong origin collection id.
 		WrongOriginCollectionAtOrigin,
+
+		CollectionIdNotProvided,
 	}
 
 	#[pallet::call]
@@ -568,8 +707,9 @@ pub mod pallet {
 		pub fn collection_x_transfer(
 			origin: OriginFor<T>,
 			origin_collection: T::CollectionId,
-			dest_collection_id: T::CollectionId,
+			dest_collection_id: Option<T::CollectionId>,
 			destination_para: ParaId,
+			config: Option<CollectionConfigFor<T, I>>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin.clone())?;
 
@@ -631,8 +771,10 @@ pub mod pallet {
 							require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
 							call: <T as Config<I>>::RuntimeCall::from(
 								Call::<T, I>::parse_collection_empty {
-									origin_collection: dest_collection_id.clone(),
-									collection_metadata: collection_metadata.clone().unwrap(),								
+									origin_collection: origin_collection.clone(),
+									destination_collection: dest_collection_id.clone(),
+									collection_metadata: collection_metadata.clone().unwrap(),
+									config,								
 								},
 							)
 							.encode()
@@ -730,6 +872,7 @@ pub mod pallet {
 								collection_id: origin_collection.clone(),
 								proposed_collection_owner: who.clone(),
 								proposed_destination_para: destination_para,
+								proposed_destination_config: config.clone(),
 								proposed_dest_collection_id: dest_collection_id,
 								owners: different_owners,
 								number_of_votes: Votes {
@@ -805,7 +948,7 @@ pub mod pallet {
 									origin_para: parachain_info::Pallet::<T>::parachain_id(),
 									collection_metadata: collection_metadata.unwrap(),
 									nfts: nft_metadata,
-									dest_collection_id: Some(dest_collection_id.clone()),
+									dest_collection_id: dest_collection_id.clone(),
 								},
 							)
 							.encode()
@@ -1071,6 +1214,7 @@ pub mod pallet {
 						proposal.collection_id.clone(),
 						proposal.proposed_dest_collection_id.clone(),
 						proposal.proposed_destination_para.clone(),
+						None,
 					)?;
 				}
 
@@ -1124,7 +1268,7 @@ pub mod pallet {
 									origin_para: parachain_info::Pallet::<T>::parachain_id(),
 									collection_metadata: collection_metadata.unwrap(),
 									nfts: nft_metadata.clone(),
-									dest_collection_id: Some(proposal.proposed_dest_collection_id.clone()),
+									dest_collection_id: proposal.proposed_dest_collection_id.clone(),
 								},
 							)
 							.encode()
@@ -1950,15 +2094,53 @@ pub mod pallet {
 		pub fn parse_collection_empty(
 			origin: OriginFor<T>,
 			origin_collection: T::CollectionId,
+			destination_collection: Option<T::CollectionId>,
 			collection_metadata: BoundedVec<u8, T::StringLimit>,
+			config: Option<CollectionConfigFor<T, I>>,
 		) -> DispatchResultWithPostInfo {
 			let signed_origin = ensure_signed(origin.clone())?;
 			let signed_origin_lookup = T::Lookup::unlookup(signed_origin.clone());
 
+			// Check if destination collection is provided
+			let mut destination_collection = match destination_collection {
+				Some(c) => c,
+				None => origin_collection.clone(),
+			};
+
+			// Check if collection exists
+			match pallet_uniques::Collection::<T, I>::contains_key(&destination_collection) {
+				true => {
+					// Try with origin collection id, maybe that is empty
+					match pallet_uniques::Collection::<T, I>::contains_key(&origin_collection) {
+						true => {
+							// Use for cycle to find empty collection
+							// let mut i = 0;
+							// loop {
+							// 	let new_collection: T::CollectionId = T::CollectionId::from(i as u32);
+							// 	if !pallet_uniques::Collection::<T, I>::contains_key(&new_collection) {
+							// 		destination_collection = new_collection;
+							// 		break;
+							// 	}
+							// 	if i == u32::MAX {
+							// 		// Deposit event indicating failure to create collection
+							// 		Self::deposit_event(Event::CollectionListFull {
+							// 			owner: signed_origin_lookup.clone(),
+							// 		});
+							// 		return Ok(().into());
+							//	}
+							//	i += 1;
+							//}
+						},
+						false => { destination_collection = origin_collection.clone(); },
+					}
+				},
+				false => {},
+			}			
+
 			// Create the collection
 			match pallet_uniques::Pallet::<T, I>::create(
 				origin.clone(),
-				origin_collection.clone(),
+				destination_collection.clone(),
 				signed_origin_lookup.clone(),
 			) {
 				Ok(_) => {},
