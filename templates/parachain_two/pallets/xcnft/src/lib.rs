@@ -122,6 +122,15 @@ pub mod pallet {
 	#[pallet::pallet]
 	pub struct Pallet<T, I = ()>(PhantomData<(T, I)>);
 
+	/// Add description!!!!
+	#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Clone, PartialEq, Default, Debug)]
+	#[scale_info(skip_type_params(T, I))]
+	pub struct GeneralizedDestroyWitness {
+		item_meta: u32,
+		item_configs: u32,
+		attributes: u32,
+	}
+
 	/// Create struct for collection config, in case, that the message comes from nfts chain
 	#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Clone, PartialEq, Default, Debug)]
 	#[scale_info(skip_type_params(T))]
@@ -405,7 +414,7 @@ pub mod pallet {
 		CollectionBurnFailedToXCM {
 			e: SendError,
 			collection_id: T::CollectionId,
-			burn_data: pallet_uniques::DestroyWitness,
+			burn_data: GeneralizedDestroyWitness,
 			owner: T::AccountId,
 			destination: ParaId,
 		},
@@ -413,7 +422,7 @@ pub mod pallet {
 		/// Event emited when collection burn prompt is transferred cross-chain.
 		CollectionBurnSent {
 			collection_id: T::CollectionId,
-			burn_data: pallet_uniques::DestroyWitness,
+			burn_data: GeneralizedDestroyWitness,
 			owner: T::AccountId,
 			destination: ParaId,
 		},
@@ -949,6 +958,7 @@ pub mod pallet {
 									collection_metadata: collection_metadata.unwrap(),
 									nfts: nft_metadata,
 									dest_collection_id: dest_collection_id.clone(),
+									config,
 								},
 							)
 							.encode()
@@ -1214,7 +1224,7 @@ pub mod pallet {
 						proposal.collection_id.clone(),
 						proposal.proposed_dest_collection_id.clone(),
 						proposal.proposed_destination_para.clone(),
-						None,
+						proposal.proposed_destination_config.clone(),
 					)?;
 				}
 
@@ -1265,6 +1275,7 @@ pub mod pallet {
 							call: <T as Config<I>>::RuntimeCall::from(
 								Call::<T, I>::parse_collection_diff_owners {
 									origin_collection_id: proposal.collection_id.clone(),
+									config: proposal.proposed_destination_config.clone(),
 									origin_para: parachain_info::Pallet::<T>::parachain_id(),
 									collection_metadata: collection_metadata.unwrap(),
 									nfts: nft_metadata.clone(),
@@ -1820,7 +1831,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			destination_collection_id: T::CollectionId,
 			destination_para: ParaId,
-			witnes_data: pallet_uniques::DestroyWitness,
+			witnes_data: GeneralizedDestroyWitness,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
@@ -2193,15 +2204,21 @@ pub mod pallet {
 		pub fn parse_collection_burn(
 			origin: OriginFor<T>,
 			collection_to_burn: T::CollectionId,
-			witness_data: pallet_uniques::DestroyWitness,
+			witness_data: GeneralizedDestroyWitness,
 		) -> DispatchResultWithPostInfo {
 			let signed_origin = ensure_signed(origin.clone())?;
 			let signed_origin_lookup = T::Lookup::unlookup(signed_origin.clone());
+			
+			let destroy_witness = DestroyWitness{
+				items: witness_data.item_configs.clone(),
+				item_metadatas: witness_data.item_meta.clone(),
+				attributes: witness_data.attributes.clone(),
+			};
 
 			match pallet_uniques::Pallet::<T, I>::destroy(
 				origin.clone(),
 				collection_to_burn.clone(),
-				witness_data.clone(),
+				destroy_witness.clone(),
 			) {
 				Ok(_) => {},
 				Err(e) => {
@@ -2264,8 +2281,7 @@ pub mod pallet {
 			new_owner: AccountIdLookupOf<T>,
 			collection: T::CollectionId,
 		) -> DispatchResultWithPostInfo {
-			let signed_origin = ensure_signed(origin.clone())?;
-			let signed_origin_lookup = T::Lookup::unlookup(signed_origin.clone());
+			ensure_signed(origin.clone())?;
 
 			match pallet_uniques::Pallet::<T, I>::transfer_ownership(
 				origin.clone(),
@@ -2277,7 +2293,7 @@ pub mod pallet {
 					// Deposit event indicating failure to transfer ownership
 					Self::deposit_event(Event::CollectionOwnershipTransferFailed {
 						collection_id: collection.clone(),
-						owner: signed_origin_lookup.clone(),
+						owner: new_owner.clone(),
 						error: e,
 					});
 				},
@@ -2571,6 +2587,7 @@ pub mod pallet {
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn parse_collection_same_owner(
 			origin: OriginFor<T>,
+			config: Option<CollectionConfigFor<T, I>>,
 			collection_metadata: BoundedVec<u8, T::StringLimit>,
 			nfts: Vec<(T::ItemId, BoundedVec<u8, T::StringLimit>)>,
 			origin_para: ParaId,
@@ -2580,7 +2597,40 @@ pub mod pallet {
 			let who = ensure_signed(origin.clone())?;
 			let signed_origin_lookup = T::Lookup::unlookup(who.clone());
 
-			let col_id = dest_collection_id.unwrap();
+			let mut col_id = match dest_collection_id.clone() {
+				Some(c) => c,
+				None => origin_collection_id.clone(),
+			};
+
+			// Check if collection exists
+			match pallet_uniques::Collection::<T, I>::contains_key(&col_id) {
+				true => {
+					// Try with origin collection id, maybe that is empty
+					match pallet_uniques::Collection::<T, I>::contains_key(&origin_collection_id) {
+						true => {
+							// Use for cycle to find empty collection
+							// let mut i = 0;
+							// loop {
+							// 	let new_collection: T::CollectionId = T::CollectionId::from(i as u32);
+							// 	if !pallet_uniques::Collection::<T, I>::contains_key(&new_collection) {
+							// 		destination_collection = new_collection;
+							// 		break;
+							// 	}
+							// 	if i == u32::MAX {
+							// 		// Deposit event indicating failure to create collection
+							// 		Self::deposit_event(Event::CollectionListFull {
+							// 			owner: signed_origin_lookup.clone(),
+							// 		});
+							// 		return Ok(().into());
+							//	}
+							//	i += 1;
+							//}
+						},
+						false => { col_id = origin_collection_id.clone(); },
+					}
+				},
+				false => {},
+			}		
 
 			match pallet_uniques::Pallet::<T, I>::create(
 				origin.clone(),
@@ -2637,7 +2687,7 @@ pub mod pallet {
 					},
 				}
 				//If empty metadata, skip
-				if data.is_empty() {
+				if !data.is_empty() {
 					match pallet_uniques::Pallet::<T, I>::set_metadata(
 						origin.clone(),
 						col_id.clone(),
@@ -2695,6 +2745,7 @@ pub mod pallet {
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn parse_collection_diff_owners(
 			origin: OriginFor<T>,
+			config: Option<CollectionConfigFor<T, I>>,
 			collection_metadata: BoundedVec<u8, T::StringLimit>,
 			nfts: Vec<(T::ItemId, AccountIdLookupOf<T>, BoundedVec<u8, T::StringLimit>)>,
 			origin_para: ParaId,
@@ -2704,7 +2755,41 @@ pub mod pallet {
 			let who = ensure_signed(origin.clone())?;
 			let signed_origin_lookup = T::Lookup::unlookup(who.clone());
 
-			let col_id = dest_collection_id.unwrap();
+			let mut col_id = match dest_collection_id.clone() {
+				Some(c) => c,
+				None => origin_collection_id.clone(),
+			};
+
+			// Check if collection exists
+			match pallet_uniques::Collection::<T, I>::contains_key(&col_id) {
+				true => {
+					// Try with origin collection id, maybe that is empty
+					match pallet_uniques::Collection::<T, I>::contains_key(&origin_collection_id) {
+						true => {
+							// Use for cycle to find empty collection
+							// let mut i = 0;
+							// loop {
+							// 	let new_collection: T::CollectionId = T::CollectionId::from(i as u32);
+							// 	if !pallet_uniques::Collection::<T, I>::contains_key(&new_collection) {
+							// 		destination_collection = new_collection;
+							// 		break;
+							// 	}
+							// 	if i == u32::MAX {
+							// 		// Deposit event indicating failure to create collection
+							// 		Self::deposit_event(Event::CollectionListFull {
+							// 			owner: signed_origin_lookup.clone(),
+							// 		});
+							// 		return Ok(().into());
+							//	}
+							//	i += 1;
+							//}
+						},
+						false => { col_id = origin_collection_id.clone(); },
+					}
+				},
+				false => {},
+			}			
+
 
 			match pallet_uniques::Pallet::<T, I>::create(
 				origin.clone(),
