@@ -1,41 +1,38 @@
-
 #![cfg(test)]
 use crate::{
 	self as pallet_parachain_xcnft,
-	test::relay::currency::{CENTS, MILLICENTS},
+	test::{
+		relay::currency::{CENTS, MILLICENTS},
+		*,
+	},
 };
 use cumulus_primitives_core::relay_chain::CandidateHash;
-use frame_support::{assert_ok, traits::AsEnsureOriginWithArg};
-use polkadot_runtime_common::{
-	paras_sudo_wrapper,
-	xcm_sender::{ChildParachainRouter, ExponentialPrice},
-};
-use sp_runtime::BuildStorage;
-use crate::test::*;
 use frame_support::{
-	construct_runtime,
+	assert_ok, construct_runtime,
 	dispatch::DispatchClass,
 	pallet_prelude::{DispatchResult, Get},
 	parameter_types,
 	traits::{
-		ConstU128, ConstU16, ConstU32, ConstU64, Currency, Everything, GenesisBuild, Nothing,
-		ProcessMessage, ProcessMessageError,
+		AsEnsureOriginWithArg, ConstU128, ConstU16, ConstU32, ConstU64, Currency, Everything,
+		GenesisBuild, KeyOwnerProofSystem, Nothing, ProcessMessage, ProcessMessageError,
 	},
 	weights::{constants::RocksDbWeight, IdentityFee, Weight, WeightMeter},
-	
 };
-use frame_support::traits::KeyOwnerProofSystem;
 use polkadot_parachain::primitives::ValidationCode;
-use sp_runtime::traits::AccountIdConversion;
+use polkadot_runtime_common::{
+	paras_sudo_wrapper,
+	xcm_sender::{ChildParachainRouter, ExponentialPrice},
+};
+use sp_runtime::{traits::AccountIdConversion, BuildStorage};
 
 use crate::test::relay::currency::DOLLARS;
 use cumulus_primitives_core::{
 	relay_chain::{AuthorityDiscoveryId, SessionIndex, ValidatorIndex},
 	ChannelStatus, GetChannelInfo, ParaId,
 };
-use polkadot_runtime_parachains::disputes::SlashingHandler;
 use frame_support::traits::ValidatorSetWithIdentification;
 use frame_system::{EnsureRoot, EnsureRootWithSuccess, EnsureSigned};
+use polkadot_runtime_parachains::disputes::SlashingHandler;
 use sp_runtime::{transaction_validity::TransactionPriority, Permill};
 use std::{cell::RefCell, collections::HashMap};
 pub mod currency {
@@ -66,15 +63,18 @@ use xcm_builder::{EnsureXcmOrigin, NativeAsset};
 use pallet_nfts::PalletFeatures;
 
 pub use polkadot_runtime_parachains::{
-	configuration,
-	inclusion::{AggregateMessageOrigin, UmpQueueId},
-	origin, shared,disputes, inclusion, paras, scheduler, session_info, assigner, assigner_parachains, assigner_on_demand,hrmp,
-	dmp as parachains_dmp, paras::ParaGenesisArgs, schedule_para_initialize,
+	assigner, assigner_on_demand, assigner_parachains, configuration, disputes,
 	disputes::slashing as parachains_slashing,
+	dmp as parachains_dmp, hrmp, inclusion,
+	inclusion::{AggregateMessageOrigin, UmpQueueId},
+	origin, paras,
+	paras::ParaGenesisArgs,
+	schedule_para_initialize, scheduler, session_info, shared,
 };
 use primitives::ValidatorId;
 pub type BlockNumber = u64;
 pub type Index = u32;
+use sp_runtime::KeyTypeId;
 use xcm::v3::prelude::*;
 use xcm_builder::{
 	AccountId32Aliases, AllowTopLevelPaidExecutionFrom, ChildParachainAsNative,
@@ -83,7 +83,6 @@ use xcm_builder::{
 	TakeWeightCredit, UsingComponents,
 };
 use xcm_executor::XcmExecutor;
-use sp_runtime::KeyTypeId;
 type Origin = <Test as frame_system::Config>::RuntimeOrigin;
 use crate::Config;
 
@@ -397,7 +396,6 @@ impl SlashingHandler<BlockNumber> for Test {
 	fn initializer_on_new_session(_: SessionIndex) {}
 }
 
-
 impl disputes::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type RewardValidators = Self;
@@ -436,7 +434,6 @@ impl disputes::RewardValidators for Test {
 		REWARD_VALIDATORS.with(|r| r.borrow_mut().push((session, validators.into_iter().collect())))
 	}
 }
-
 
 thread_local! {
 	pub static DISCOVERY_AUTHORITIES: RefCell<Vec<AuthorityDiscoveryId>> = RefCell::new(Vec::new());
@@ -565,7 +562,6 @@ impl xcm_executor::Config for XcmConfig {
 	type CallDispatcher = RuntimeCall;
 	type SafeCallFilter = Everything;
 	type Aliasers = ();
-	
 }
 
 pub type LocalOriginToLocation = SignedToAccountId32<RuntimeOrigin, AccountId, AnyNetwork>;
@@ -668,7 +664,6 @@ pub fn new_test_ext(state: MockGenesisConfig) -> sp_io::TestExternalities {
 	let mut t = state.system.build_storage().unwrap();
 	state.configuration.assimilate_storage(&mut t).unwrap();
 	state.paras.assimilate_storage(&mut t).unwrap();
-
 
 	let mut ext: sp_io::TestExternalities = t.into();
 	ext.register_extension(KeystoreExt(Arc::new(MemoryKeystore::new()) as KeystorePtr));

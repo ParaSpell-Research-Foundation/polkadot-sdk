@@ -32,7 +32,6 @@ serde_json = { workspace = true, default-features = false }
 # Local
 pallet-parachain-template = { workspace = true }
 pallet-parachain-xcnft = { workspace = true }
-pallet-uniques = { workspace = true }
 pallet-nfts = { workspace = true }
 
 
@@ -122,7 +121,6 @@ std = [
 	"pallet-parachain-template/std",
 	"pallet-parachain-xcnft/std",
 	"pallet-session/std",
-	"pallet-uniques/std",
 	"pallet-nfts/std",
 	"pallet-sudo/std",
 	"pallet-timestamp/std",

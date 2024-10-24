@@ -33,8 +33,6 @@ serde_json = { workspace = true, default-features = false }
 pallet-parachain-template-two = { workspace = true }
 pallet-parachain-xcnft-two = { workspace = true }
 pallet-uniques = { workspace = true }
-pallet-nfts = { workspace = true }
-
 
 # Substrate / FRAME
 frame-benchmarking = { optional = true, workspace = true }
@@ -123,7 +121,6 @@ std = [
 	"pallet-parachain-xcnft-two/std",
 	"pallet-session/std",
 	"pallet-uniques/std",
-	"pallet-nfts/std",
 	"pallet-sudo/std",
 	"pallet-timestamp/std",
 	"pallet-transaction-payment-rpc-runtime-api/std",

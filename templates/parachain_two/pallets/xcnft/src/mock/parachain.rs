@@ -23,8 +23,8 @@ pub use sp_runtime::{
 };
 
 use crate::test::parachain::currency::DOLLARS;
-use sp_runtime::BuildStorage;
 use sp_core::{H256, U256};
+use sp_runtime::BuildStorage;
 
 pub type CollectionId = u64;
 type Origin = <Test as frame_system::Config>::RuntimeOrigin;
@@ -290,7 +290,6 @@ impl xcm_executor::Config for XcmConfig {
 	type CallDispatcher = RuntimeCall;
 	type SafeCallFilter = Everything;
 	type Aliasers = ();
-
 }
 
 pub struct ChannelInfo;
