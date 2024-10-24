@@ -81,7 +81,7 @@ pub mod pallet {
 		traits::Incrementable,
 	};
 	use frame_system::pallet_prelude::*;
-	use pallet_nfts::{CollectionConfigFor, CollectionSettings, MintSettings, DestroyWitness};
+	use pallet_nfts::{CollectionConfigFor, CollectionSettings, DestroyWitness, MintSettings};
 	use scale_info::prelude::vec;
 	use sp_runtime::{traits::StaticLookup, DispatchError, DispatchErrorWithPostInfo};
 	use sp_std::prelude::*;
@@ -116,7 +116,8 @@ pub mod pallet {
 	#[pallet::pallet]
 	pub struct Pallet<T, I = ()>(PhantomData<(T, I)>);
 
-	/// Add description!!!!
+	/// Following structure provides generalized version of DestroyWitness parameter that has
+	/// different composition in each nft pallet (pallet_uniques || pallet_nfts)
 	#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Clone, PartialEq, Default, Debug)]
 	#[scale_info(skip_type_params(T, I))]
 	pub struct GeneralizedDestroyWitness {
@@ -1141,7 +1142,9 @@ pub mod pallet {
 									origin_para: parachain_info::Pallet::<T>::parachain_id(),
 									collection_metadata: collection_metadata.unwrap(),
 									nfts: nft_metadata.clone(),
-									dest_collection_id: proposal.proposed_dest_collection_id.clone(),
+									dest_collection_id: proposal
+										.proposed_dest_collection_id
+										.clone(),
 								},
 							)
 							.encode()
@@ -1961,7 +1964,7 @@ pub mod pallet {
 		pub fn parse_collection_empty(
 			origin: OriginFor<T>,
 			origin_collection: T::CollectionId,
-			destination_collection: Option<T::CollectionId>,
+			_destination_collection: Option<T::CollectionId>,
 			collection_metadata: BoundedVec<u8, T::StringLimit>,
 			config: Option<CollectionConfigFor<T, I>>,
 		) -> DispatchResultWithPostInfo {
@@ -1978,7 +1981,8 @@ pub mod pallet {
 				// Create default configfor collection
 				let def_config = CollectionConfigFor::<T, I> {
 					settings: CollectionSettings::all_enabled(), // Default settings (all enabled)
-					max_supply: None, // No maximum supply defined initially
+					max_supply: None,                            /* No maximum supply defined
+					                                              * initially */
 					mint_settings: MintSettings::default(), // Use default mint settings
 				};
 
@@ -1993,8 +1997,7 @@ pub mod pallet {
 						Self::deposit_event(Event::CollectionMintFailed { error: e });
 					},
 				}
-			}
-			else{
+			} else {
 				match pallet_nfts::Pallet::<T, I>::create(
 					origin.clone(),
 					signed_origin_lookup.clone(),
@@ -2005,14 +2008,14 @@ pub mod pallet {
 						//  Deposit event indicating failure to create collection
 						Self::deposit_event(Event::CollectionMintFailed { error: e });
 					},
-				}   
+				}
 			}
 
 			let mut user_collection = next_collection_id.clone();
 
 			// just to be sure, check if user is collection owner
 			if pallet_nfts::Pallet::<T, I>::collection_owner(next_collection_id.clone()).unwrap() !=
-			signed_origin.clone()
+				signed_origin.clone()
 			{
 				//Get current next_collection_id
 				let current_next_collection_id = pallet_nfts::NextCollectionId::<T, I>::get()
@@ -2022,7 +2025,7 @@ pub mod pallet {
 				// collection that is owned by the user
 				while next_collection_id != current_next_collection_id {
 					if pallet_nfts::Pallet::<T, I>::collection_owner(next_collection_id).unwrap() ==
-					signed_origin.clone()
+						signed_origin.clone()
 					{
 						// We have users collection
 						user_collection = next_collection_id.clone();
@@ -2077,7 +2080,7 @@ pub mod pallet {
 			let signed_origin = ensure_signed(origin.clone())?;
 			let signed_origin_lookup = T::Lookup::unlookup(signed_origin.clone());
 
-			let destroy_witness = DestroyWitness{
+			let destroy_witness = DestroyWitness {
 				item_metadatas: witness_data.item_meta.clone(),
 				item_configs: witness_data.item_configs.clone(),
 				attributes: witness_data.attributes.clone(),
@@ -2456,7 +2459,7 @@ pub mod pallet {
 			nfts: Vec<(T::ItemId, BoundedVec<u8, T::StringLimit>)>,
 			origin_para: ParaId,
 			origin_collection_id: T::CollectionId,
-			dest_collection_id: Option<T::CollectionId>
+			_dest_collection_id: Option<T::CollectionId>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin.clone())?;
 			let signed_origin_lookup = T::Lookup::unlookup(who.clone());
@@ -2471,7 +2474,8 @@ pub mod pallet {
 				// Create default configfor collection
 				let def_config = CollectionConfigFor::<T, I> {
 					settings: CollectionSettings::all_enabled(), // Default settings (all enabled)
-					max_supply: None, // No maximum supply defined initially
+					max_supply: None,                            /* No maximum supply defined
+					                                              * initially */
 					mint_settings: MintSettings::default(), // Use default mint settings
 				};
 
@@ -2486,8 +2490,7 @@ pub mod pallet {
 						Self::deposit_event(Event::CollectionMintFailed { error: e });
 					},
 				}
-			}
-			else{
+			} else {
 				match pallet_nfts::Pallet::<T, I>::create(
 					origin.clone(),
 					signed_origin_lookup.clone(),
@@ -2498,7 +2501,7 @@ pub mod pallet {
 						//  Deposit event indicating failure to create collection
 						Self::deposit_event(Event::CollectionMintFailed { error: e });
 					},
-				}   
+				}
 			}
 
 			let mut user_collection = next_collection_id.clone();
@@ -2631,7 +2634,7 @@ pub mod pallet {
 			nfts: Vec<(T::ItemId, AccountIdLookupOf<T>, BoundedVec<u8, T::StringLimit>)>,
 			origin_para: ParaId,
 			origin_collection_id: T::CollectionId,
-			dest_collection_id: Option<T::CollectionId>,
+			_dest_collection_id: Option<T::CollectionId>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin.clone())?;
 			let signed_origin_lookup = T::Lookup::unlookup(who.clone());
@@ -2646,7 +2649,8 @@ pub mod pallet {
 				// Create default configfor collection
 				let def_config = CollectionConfigFor::<T, I> {
 					settings: CollectionSettings::all_enabled(), // Default settings (all enabled)
-					max_supply: None, // No maximum supply defined initially
+					max_supply: None,                            /* No maximum supply defined
+					                                              * initially */
 					mint_settings: MintSettings::default(), // Use default mint settings
 				};
 
@@ -2661,8 +2665,7 @@ pub mod pallet {
 						Self::deposit_event(Event::CollectionMintFailed { error: e });
 					},
 				}
-			}
-			else{
+			} else {
 				match pallet_nfts::Pallet::<T, I>::create(
 					origin.clone(),
 					signed_origin_lookup.clone(),
@@ -2673,7 +2676,7 @@ pub mod pallet {
 						//  Deposit event indicating failure to create collection
 						Self::deposit_event(Event::CollectionMintFailed { error: e });
 					},
-				}   
+				}
 			}
 
 			let mut user_collection = next_collection_id.clone();

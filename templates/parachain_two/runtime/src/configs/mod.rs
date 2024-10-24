@@ -27,8 +27,6 @@ mod xcm_config;
 pub use pallet_parachain_xcnft_two;
 pub use pallet_uniques;
 
-use pallet_nfts::{AttributeNamespace, Call as NftsCall};
-
 // Substrate and Polkadot dependencies
 use cumulus_pallet_parachain_system::RelayNumberMonotonicallyIncreases;
 use cumulus_primitives_core::{AggregateMessageOrigin, ParaId};
@@ -346,7 +344,6 @@ parameter_types! {
 	pub const MaxTips: u32 = 1;
 	pub const MaxDeadlineDuration: u32 = 1;
 	pub const MaxAttributesPerCall: u32 = 10;
-	pub NftFeatures: pallet_nfts::PalletFeatures = pallet_nfts::PalletFeatures::all_enabled();
 	pub const proposal_time_in_blocks_parameter: u32 = 10;
 	pub const max_owners_parameter: u32 = 1000000;
 	pub const max_votes: u32 = 1000000;
@@ -371,30 +368,3 @@ impl pallet_uniques::Config for Runtime {
 	type WeightInfo = ();
 }
 pub type AccountPublic = <MultiSignature as Verify>::Signer;
-
-impl pallet_nfts::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type CollectionId = u32;
-	type ItemId = u32;
-	type Currency = Balances;
-	type ForceOrigin = EnsureRoot<AccountId>;
-	type CreateOrigin = EnsureSigned<AccountId>;
-	type CollectionDeposit = CollectionDeposit;
-	type Locker = ();
-	type ItemDeposit = ItemDeposit;
-	type MetadataDepositBase = UniquesMetadataDepositBase;
-	type AttributeDepositBase = AttributeDepositBase;
-	type DepositPerByte = DepositPerByte;
-	type StringLimit = UniquesStringLimit;
-	type KeyLimit = KeyLimit;
-	type ValueLimit = ValueLimit;
-	type ApprovalsLimit = ApprovalsLimit;
-	type ItemAttributesApprovalsLimit = ItemAttributesApprovalsLimit;
-	type MaxTips = MaxTips;
-	type MaxDeadlineDuration = MaxDeadlineDuration;
-	type MaxAttributesPerCall = MaxAttributesPerCall;
-	type Features = NftFeatures;
-	type OffchainSignature = MultiSignature;
-	type OffchainPublic = AccountPublic;
-	type WeightInfo = ();
-}

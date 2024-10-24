@@ -28,7 +28,6 @@ serde_json = { workspace = true, default-features = false, features = ["alloc"] 
 # Local
 pallet-parachain-template = { workspace = true }
 pallet-parachain-xcnft = { workspace = true }
-pallet-uniques = { workspace = true }
 pallet-nfts = { workspace = true }
 
 
@@ -78,7 +77,6 @@ std = [
 	"polkadot-sdk/std",
 	"pallet-parachain-xcnft/std",
 	"pallet-session/std",
-	"pallet-uniques/std",
 	"pallet-nfts/std",
 	"pallet-sudo/std",
 	"pallet-timestamp/std",

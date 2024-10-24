@@ -316,10 +316,7 @@ mod runtime {
 
 	#[runtime::pallet_index(52)]
 	pub type UniquesModule = pallet_uniques;
-
-	#[runtime::pallet_index(53)]
-	pub type NftModule = pallet_nfts;
-
+ 
 }
 
 #[docify::export(register_validate_block)]

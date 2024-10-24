@@ -2,12 +2,12 @@
 
 use super::*;
 use sp_io::TestExternalities;
-use sp_runtime::{AccountId32};
+use sp_runtime::AccountId32;
 mod parachain;
 mod relaychain;
 use crate as xnft;
-use xcm_simulator::{decl_test_network, decl_test_parachain, decl_test_relay_chain, TestExt};
 use sp_runtime::BuildStorage;
+use xcm_simulator::{decl_test_network, decl_test_parachain, decl_test_relay_chain, TestExt};
 
 pub const ALICE: AccountId32 = AccountId32::new([0u8; 32]);
 pub const BOB: AccountId32 = AccountId32::new([1u8; 32]);
@@ -81,29 +81,24 @@ pub fn para_teleport_ext(para_id: u32) -> TestExternalities {
 
 	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
 
-    let parachain_info_config = parachain_info::GenesisConfig::<Test> {
-	_config: Default::default(),
-	parachain_id: para_id.into(),
-    };
-    parachain_info_config.assimilate_storage(&mut t).unwrap();
+	let parachain_info_config = parachain_info::GenesisConfig::<Test> {
+		_config: Default::default(),
+		parachain_id: para_id.into(),
+	};
+	parachain_info_config.assimilate_storage(&mut t).unwrap();
 	let mut ext = TestExternalities::new(t);
 	ext.execute_with(|| System::set_block_number(1));
 	ext
 }
 
-
 pub fn relay_ext() -> sp_io::TestExternalities {
-	use relaychain::{Test, System};
+	use relaychain::{System, Test};
 
-	let mut t = frame_system::GenesisConfig::<Test>::default()
-		.build_storage()
+	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
+
+	pallet_balances::GenesisConfig::<Test> { balances: vec![(ALICE, 1_000)] }
+		.assimilate_storage(&mut t)
 		.unwrap();
-
-	pallet_balances::GenesisConfig::<Test> {
-		balances: vec![(ALICE, 1_000)],
-	}
-	.assimilate_storage(&mut t)
-	.unwrap();
 
 	let mut ext = sp_io::TestExternalities::new(t);
 	ext.execute_with(|| System::set_block_number(1));

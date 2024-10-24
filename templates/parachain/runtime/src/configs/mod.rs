@@ -25,7 +25,6 @@
 
 mod xcm_config;
 pub use pallet_parachain_xcnft;
-pub use pallet_uniques;
 
 use pallet_nfts::{AttributeNamespace, Call as NftsCall};
 
@@ -359,24 +358,6 @@ parameter_types! {
 	pub const max_votes: u32 = 1000000;
 }
 
-impl pallet_uniques::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type CollectionId = u128;
-	type ItemId = u128;
-	type Currency = Balances;
-	type ForceOrigin = EnsureRoot<AccountId>;
-	type CreateOrigin = EnsureSigned<AccountId>;
-	type Locker = ();
-	type CollectionDeposit = CollectionDeposit;
-	type ItemDeposit = ItemDeposit;
-	type MetadataDepositBase = UniquesMetadataDepositBase;
-	type AttributeDepositBase = AttributeDepositBase;
-	type DepositPerByte = DepositPerByte;
-	type StringLimit = UniquesStringLimit;
-	type KeyLimit = KeyLimit;
-	type ValueLimit = ValueLimit;
-	type WeightInfo = ();
-}
 pub type AccountPublic = <MultiSignature as Verify>::Signer;
 
 impl pallet_nfts::Config for Runtime {

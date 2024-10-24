@@ -1,6 +1,6 @@
 /// Code originates from pallet_nfts
 /// 
-/// Used to mimic collectionconfigfor parameter
+/// Used to mimic CollectionConfigFor parameter from NFTs pallet
 /// 
 /// 
 macro_rules! impl_codec_bitflags {

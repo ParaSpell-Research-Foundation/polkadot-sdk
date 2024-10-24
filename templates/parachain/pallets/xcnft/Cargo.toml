@@ -36,7 +36,6 @@ parachain-info = { workspace = true }
 sp-runtime = { workspace = true }
 sp-std = {workspace = true}
 
-pallet-uniques = { workspace = true, default-features = false }
 pallet-nfts = {workspace=true, default-features = false}
 
 [dev-dependencies]
@@ -59,7 +58,6 @@ runtime-benchmarks = [
 std = [
 	"codec/std",
 	"scale-info/std",
-	"pallet-uniques/std",
 	"frame-benchmarking?/std",
 	"frame-support/std",
 	"frame-system/std",

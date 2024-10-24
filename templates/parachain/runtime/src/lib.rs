@@ -313,9 +313,6 @@ mod runtime {
 	#[runtime::pallet_index(51)]
 	pub type TemplatePallet = pallet_parachain_template;
 
-	#[runtime::pallet_index(52)]
-	pub type UniquesModule = pallet_uniques;
-
 	#[runtime::pallet_index(53)]
 	pub type NftModule = pallet_nfts;
 
