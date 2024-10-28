@@ -184,7 +184,7 @@ pub struct ItemMetadata<Deposit, StringLimit: Get<u32>> {
 	/// This pays for the data stored in this struct.
 	pub deposit: Deposit,
 	/// General information concerning this item. Limited in length by `StringLimit`. This will
-	/// generally be either a JSON dump or the hash of some JSON which can be found on a
+	/// generally be either a JSON dump or the hash of some JSON which can be found on
 	/// hash-addressable global publication system such as IPFS.
 	pub data: BoundedVec<u8, StringLimit>,
 }
