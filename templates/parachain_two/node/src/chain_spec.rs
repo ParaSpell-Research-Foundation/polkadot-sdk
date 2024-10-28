@@ -1,4 +1,7 @@
-use  parachain_template_runtime_two as runtime;
+
+use polkadot_sdk::*;
+
+use parachain_template_runtime as runtime;
 use sc_chain_spec::{ChainSpecExtension, ChainSpecGroup};
 use sc_service::ChainType;
 use serde::{Deserialize, Serialize};
@@ -24,7 +27,7 @@ impl Extensions {
 	}
 }
 
-pub fn development_config() -> ChainSpec {
+pub fn development_chain_spec() -> ChainSpec {
 	// Give your base currency a unit name and decimal places
 	let mut properties = sc_chain_spec::Properties::new();
 	properties.insert("tokenSymbol".into(), "UNIT".into());
@@ -42,11 +45,11 @@ pub fn development_config() -> ChainSpec {
 	.with_name("Development")
 	.with_id("dev")
 	.with_chain_type(ChainType::Development)
-	.with_genesis_config_preset_name("development")
+	.with_genesis_config_preset_name(sp_genesis_builder::DEV_RUNTIME_PRESET)
 	.build()
 }
 
-pub fn local_testnet_config() -> ChainSpec {
+pub fn local_chain_spec() -> ChainSpec {
 	// Give your base currency a unit name and decimal places
 	let mut properties = sc_chain_spec::Properties::new();
 	properties.insert("tokenSymbol".into(), "UNIT".into());
@@ -65,7 +68,7 @@ pub fn local_testnet_config() -> ChainSpec {
 	.with_name("Local Testnet")
 	.with_id("local_testnet")
 	.with_chain_type(ChainType::Local)
-	.with_genesis_config_preset_name("local_testnet")
+	.with_genesis_config_preset_name(sc_chain_spec::LOCAL_TESTNET_RUNTIME_PRESET)
 	.with_protocol_id("template-local")
 	.with_properties(properties)
 	.build()

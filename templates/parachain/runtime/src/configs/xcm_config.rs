@@ -104,8 +104,7 @@ pub type Barrier = TrailingSetTopicAsId<
 			TakeWeightCredit,
 			WithComputedOrigin<
 				(
-					AllowTopLevelPaidExecutionFrom<Everything>,
-					AllowExplicitUnpaidExecutionFrom<Everything>,				// ^^^ Parent and its exec plurality get free execution
+					AllowExplicitUnpaidExecutionFrom<Everything>,
 				),
 				UniversalLocation,
 				ConstU32<8>,
@@ -113,6 +112,7 @@ pub type Barrier = TrailingSetTopicAsId<
 		),
 	>,
 >;
+
 pub struct XcmConfig;
 impl xcm_executor::Config for XcmConfig {
 	type RuntimeCall = RuntimeCall;

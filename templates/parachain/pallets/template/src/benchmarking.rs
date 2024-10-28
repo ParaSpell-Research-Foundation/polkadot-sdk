@@ -1,7 +1,8 @@
 //! Benchmarking setup for pallet-template
+#![cfg(feature = "runtime-benchmarks")]
 
 use super::*;
-use frame::{deps::frame_benchmarking::v2::*, prelude::*};
+use frame_benchmarking::v2::*;
 
 #[benchmarks]
 mod benchmarks {

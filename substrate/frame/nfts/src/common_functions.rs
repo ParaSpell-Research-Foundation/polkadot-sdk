@@ -61,31 +61,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		Ok(())
 	}
 
-	/// Returns item depositor
-	//pub fn item_depositor(collection: T::CollectionId, item: T::ItemId) -> Option<T::AccountId> {
-	//	Item::<T, I>::get(collection, item).map(|i| i.deposit.account)
-	//}
-	
-	/// Returns item deposit amount
-	//pub fn item_deposit(collection: T::CollectionId, item: T::ItemId) -> Option<DepositBalanceOf<T, I>>{
-	//	Item::<T, I>::get(collection, item).map(|i| i.deposit.amount)
-	//}
-	
-	/// Returns collection deposit
-	//pub fn deposit(collection: T::CollectionId) -> Option<DepositBalanceOf<T, I>>{
-	//	Collection::<T, I>::get(collection).map(|i| i.owner_deposit)
-	//}
-
-	/// Returns collection data
-	//pub fn collection_data(collection: T::CollectionId) -> Option<BoundedVec<u8, <T as Config<I>>::StringLimit>> {
-	//	CollectionMetadataOf::<T, I>::get(collection).map(|i| i.data)
-	//}
-
-	/// Returns item data
-	//pub fn item_data(collection: T::CollectionId, item: T::ItemId) -> Option<BoundedVec<u8, <T as Config<I>>::StringLimit>> {
-	//	ItemMetadataOf::<T, I>::get(collection, item).map(|i| i.data)
-	//}
-
 	pub(crate) fn set_next_collection_id(collection: T::CollectionId) {
 		let next_id = collection.increment();
 		NextCollectionId::<T, I>::set(next_id);

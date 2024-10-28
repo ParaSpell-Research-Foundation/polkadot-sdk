@@ -30,7 +30,6 @@ pallet-parachain-template = { workspace = true }
 pallet-parachain-xcnft = { workspace = true }
 pallet-nfts = { workspace = true }
 
-
 polkadot-sdk = { workspace = true, default-features = false, features = [
 	"pallet-aura",
 	"pallet-authorship",
@@ -75,21 +74,11 @@ std = [
 	"log/std",
 	"pallet-parachain-template/std",
 	"polkadot-sdk/std",
-	"pallet-parachain-xcnft/std",
-	"pallet-session/std",
-	"pallet-nfts/std",
-	"pallet-sudo/std",
-	"pallet-timestamp/std",
-	"pallet-transaction-payment-rpc-runtime-api/std",
-	"pallet-transaction-payment/std",
-	"pallet-xcm/std",
-	"parachain-info/std",
-	"parachains-common/std",
-	"polkadot-parachain-primitives/std",
-	"polkadot-runtime-common/std",
 	"scale-info/std",
 	"serde_json/std",
 	"substrate-wasm-builder",
+	"pallet-parachain-xcnft/std",
+	"pallet-nfts/std"
 ]
 
 runtime-benchmarks = [
@@ -98,15 +87,6 @@ runtime-benchmarks = [
 	"pallet-parachain-template/runtime-benchmarks",
 	"polkadot-sdk/runtime-benchmarks",
 	"pallet-parachain-xcnft/runtime-benchmarks",
-	"pallet-sudo/runtime-benchmarks",
-	"pallet-timestamp/runtime-benchmarks",
-	"pallet-xcm/runtime-benchmarks",
-	"parachains-common/runtime-benchmarks",
-	"polkadot-parachain-primitives/runtime-benchmarks",
-	"polkadot-runtime-common/runtime-benchmarks",
-	"sp-runtime/runtime-benchmarks",
-	"xcm-builder/runtime-benchmarks",
-	"xcm-executor/runtime-benchmarks",
 ]
 
 try-runtime = [
@@ -114,14 +94,6 @@ try-runtime = [
 	"pallet-parachain-template/try-runtime",
 	"polkadot-sdk/try-runtime",
 	"pallet-parachain-xcnft/try-runtime",
-	"pallet-session/try-runtime",
-	"pallet-sudo/try-runtime",
-	"pallet-timestamp/try-runtime",
-	"pallet-transaction-payment/try-runtime",
-	"pallet-xcm/try-runtime",
-	"parachain-info/try-runtime",
-	"polkadot-runtime-common/try-runtime",
-	"sp-runtime/try-runtime",
 ]
 
 # Enable the metadata hash generation.

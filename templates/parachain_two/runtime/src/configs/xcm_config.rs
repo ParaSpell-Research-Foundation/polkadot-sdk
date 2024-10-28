@@ -2,6 +2,11 @@ use crate::{
 	AccountId, AllPalletsWithSystem, Balances, ParachainInfo, ParachainSystem, PolkadotXcm,
 	Runtime, RuntimeCall, RuntimeEvent, RuntimeOrigin, WeightToFee, XcmpQueue,
 };
+
+use polkadot_sdk::{
+	staging_xcm as xcm, staging_xcm_builder as xcm_builder, staging_xcm_executor as xcm_executor, *,
+};
+
 use frame_support::{
 	parameter_types,
 	traits::{ConstU32, Contains, Everything, Nothing},
@@ -99,8 +104,7 @@ pub type Barrier = TrailingSetTopicAsId<
 			TakeWeightCredit,
 			WithComputedOrigin<
 				(
-					AllowTopLevelPaidExecutionFrom<Everything>,
-					AllowExplicitUnpaidExecutionFrom<Everything>,				// ^^^ Parent and its exec plurality get free execution
+					AllowExplicitUnpaidExecutionFrom<Everything>,
 				),
 				UniversalLocation,
 				ConstU32<8>,
@@ -108,6 +112,7 @@ pub type Barrier = TrailingSetTopicAsId<
 		),
 	>,
 >;
+
 pub struct XcmConfig;
 impl xcm_executor::Config for XcmConfig {
 	type RuntimeCall = RuntimeCall;

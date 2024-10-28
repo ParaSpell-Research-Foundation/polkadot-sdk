@@ -24,8 +24,10 @@
 // For more information, please refer to <http://unlicense.org>
 
 mod xcm_config;
-pub use pallet_parachain_xcnft_two;
-pub use pallet_uniques;
+
+use polkadot_sdk::{staging_parachain_info as parachain_info, staging_xcm as xcm, *};
+#[cfg(not(feature = "runtime-benchmarks"))]
+use polkadot_sdk::{staging_xcm_builder as xcm_builder, staging_xcm_executor as xcm_executor};
 
 // Substrate and Polkadot dependencies
 use cumulus_pallet_parachain_system::RelayNumberMonotonicallyIncreases;
@@ -40,14 +42,10 @@ use frame_support::{
 	weights::{ConstantMultiplier, Weight},
 	PalletId,
 };
-
 use frame_system::{
 	limits::{BlockLength, BlockWeights},
-	EnsureRoot,
+	EnsureRoot, EnsureSigned
 };
-use sp_runtime::traits::{IdentifyAccount, IdentityLookup, Verify};
-
-use frame_system::EnsureSigned;
 use pallet_xcm::{EnsureXcm, IsVoiceOfBody};
 use parachains_common::message_queue::{NarrowOriginToSibling, ParaIdToSibling};
 use polkadot_runtime_common::{
@@ -55,12 +53,6 @@ use polkadot_runtime_common::{
 };
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_runtime::Perbill;
-use sp_runtime::{
-	create_runtime_str, generic, impl_opaque_keys,
-	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT},
-	transaction_validity::{TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, ExtrinsicInclusionMode, MultiSignature,
-};
 use sp_version::RuntimeVersion;
 use xcm::latest::prelude::BodyId;
 
@@ -170,6 +162,7 @@ impl pallet_balances::Config for Runtime {
 	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type FreezeIdentifier = RuntimeFreezeReason;
 	type MaxFreezes = VariantCountOf<RuntimeFreezeReason>;
+	type DoneSlashHandler = ();
 }
 
 parameter_types! {
@@ -184,6 +177,7 @@ impl pallet_transaction_payment::Config for Runtime {
 	type LengthToFee = ConstantMultiplier<Balance, TransactionByteFee>;
 	type FeeMultiplierUpdate = SlowAdjustingFeeUpdate<Self>;
 	type OperationalFeeMultiplier = ConstU8<5>;
+	type WeightInfo = ();
 }
 
 impl pallet_sudo::Config for Runtime {
@@ -210,6 +204,7 @@ impl cumulus_pallet_parachain_system::Config for Runtime {
 	type ReservedXcmpWeight = ReservedXcmpWeight;
 	type CheckAssociatedRelayNumber = RelayNumberMonotonicallyIncreases;
 	type ConsensusHook = ConsensusHook;
+	type SelectCore = cumulus_pallet_parachain_system::DefaultCoreSelector<Runtime>;
 }
 
 impl parachain_info::Config for Runtime {}
@@ -367,4 +362,3 @@ impl pallet_uniques::Config for Runtime {
 	type ValueLimit = ValueLimit;
 	type WeightInfo = ();
 }
-pub type AccountPublic = <MultiSignature as Verify>::Signer;

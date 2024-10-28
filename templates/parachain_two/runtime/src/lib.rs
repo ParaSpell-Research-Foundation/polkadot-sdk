@@ -13,17 +13,18 @@ pub mod configs;
 mod genesis_config_presets;
 mod weights;
 
-pub use pallet_parachain_xcnft_two;
-
 extern crate alloc;
 use alloc::vec::Vec;
 use smallvec::smallvec;
+
+use polkadot_sdk::{staging_parachain_info as parachain_info, *};
+
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
 	traits::{BlakeTwo256, IdentifyAccount, Verify},
 	MultiSignature,
 };
-use sp_core::ConstU32;
+
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
@@ -34,9 +35,6 @@ use frame_support::weights::{
 };
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 pub use sp_runtime::{MultiAddress, Perbill, Permill};
-
-#[cfg(any(feature = "std", test))]
-pub use sp_runtime::BuildStorage;
 
 use weights::ExtrinsicBaseWeight;
 
@@ -74,9 +72,9 @@ pub type SignedBlock = generic::SignedBlock<Block>;
 /// BlockId type as expected by this runtime.
 pub type BlockId = generic::BlockId<Block>;
 
-/// The SignedExtension to the basic transaction logic.
+/// The extension to the basic transaction logic.
 #[docify::export(template_signed_extra)]
-pub type SignedExtra = (
+pub type TxExtension = (
 	frame_system::CheckNonZeroSender<Runtime>,
 	frame_system::CheckSpecVersion<Runtime>,
 	frame_system::CheckTxVersion<Runtime>,
@@ -89,10 +87,9 @@ pub type SignedExtra = (
 	frame_metadata_hash_extension::CheckMetadataHash<Runtime>,
 );
 
-
 /// Unchecked extrinsic type as expected by this runtime.
 pub type UncheckedExtrinsic =
-	generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
+	generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, TxExtension>;
 
 /// All migrations of the runtime, aside from the ones declared in the pallets.
 ///
@@ -143,12 +140,11 @@ impl WeightToFeePolynomial for WeightToFee {
 /// to even the core data structures.
 pub mod opaque {
 	use super::*;
-	use sp_runtime::{
+	pub use polkadot_sdk::sp_runtime::OpaqueExtrinsic as UncheckedExtrinsic;
+	use polkadot_sdk::sp_runtime::{
 		generic,
 		traits::{BlakeTwo256, Hash as HashT},
 	};
-
-	pub use sp_runtime::OpaqueExtrinsic as UncheckedExtrinsic;
 
 	/// Opaque block header type.
 	pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
@@ -316,7 +312,6 @@ mod runtime {
 
 	#[runtime::pallet_index(52)]
 	pub type UniquesModule = pallet_uniques;
- 
 }
 
 #[docify::export(register_validate_block)]
