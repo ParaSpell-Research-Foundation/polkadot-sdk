@@ -7,19 +7,19 @@ chain = "rococo-local"
 
   [[relaychain.nodes]]
   name = "alice"
-  rpc_port = 9910
+  ws_port = 9910
 
   [[relaychain.nodes]]
   name = "bob"
-  rpc_port = 9911
+  ws_port = 9911
 
   [[relaychain.nodes]]
   name = "charlie"
-  rpc_port = 9912
+  ws_port = 9912
 
   [[relaychain.nodes]]
   name = "dave"
-  rpc_port = 9913
+  ws_port = 9913
 
 [[parachains]]
 id = 1000
@@ -30,7 +30,7 @@ id = 1000
     args = [
 		"-lparachain=debug,xcm::process-message=trace,xcm::execute=trace,xcm::process=trace"
 	]
-  rpc_port = 9920
+  ws_port = 9920
 
 [[parachains]]
 id = 1001
@@ -41,4 +41,4 @@ id = 1001
   args = [
 		"-lparachain=debug,xcm::process-message=trace,xcm::execute=trace,xcm::process=trace"
 	]
-  rpc_port = 9921
+  ws_port = 9921
