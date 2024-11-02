@@ -28,20 +28,11 @@ frame-system = { workspace = true }
 
 #XCM
 xcm = { workspace = true}
-xcm-simulator = { workspace = true, default-features = true }
-xcm-executor = { workspace = true, default-features = true }
-xcm-builder = { workspace = true, default-features = true }
-pallet-xcm = { workspace = true, default-features = true }
-polkadot-core-primitives = { workspace = true, default-features = true }
-polkadot-runtime-parachains = { workspace = true, default-features = true }
-polkadot-parachain-primitives = { workspace = true, default-features = true }
+xcm-builder = { workspace = true, default-features = false }
 
 cumulus-primitives-core = { workspace = true }
 cumulus-pallet-xcm = { workspace = true }
 parachain-info = { workspace = true }
-
-pallet-message-queue = { workspace = true, default-features = true }
-sp-tracing = { workspace = true, default-features = true }
 
 
 sp-runtime = { workspace = true }
@@ -68,14 +59,9 @@ runtime-benchmarks = [
 	"frame-support/runtime-benchmarks",
 	"frame-system/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
-	"pallet-xcm/runtime-benchmarks",
-	"polkadot-parachain-primitives/runtime-benchmarks",
-	"polkadot-runtime-parachains/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 	"xcm-builder/runtime-benchmarks",
-	"xcm-executor/runtime-benchmarks",
 	"pallet-balances/runtime-benchmarks",
-	"pallet-message-queue/runtime-benchmarks",
 	"pallet-nfts/runtime-benchmarks",
 ]
 std = [
@@ -86,8 +72,6 @@ std = [
 	"frame-system/std",
 	"pallet-nfts/std",
 	"sp-runtime/std",
-	"cumulus-pallet-xcm/std",
-	"cumulus-primitives-core/std",
 	"sp-std/std",
 	"xcm/std",
 	"sp-core/std",
