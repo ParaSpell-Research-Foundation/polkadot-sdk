@@ -18,6 +18,7 @@ codec = { features = [
 scale-info = { features = [
 	"derive",
 ], workspace = true }
+log = { workspace = true }
 
 
 # Substrate
@@ -27,10 +28,20 @@ frame-system = { workspace = true }
 
 #XCM
 xcm = { workspace = true}
+xcm-simulator = { workspace = true, default-features = true }
+xcm-executor = { workspace = true, default-features = true }
+xcm-builder = { workspace = true, default-features = true }
+pallet-xcm = { workspace = true, default-features = true }
+polkadot-core-primitives = { workspace = true, default-features = true }
+polkadot-runtime-parachains = { workspace = true, default-features = true }
+polkadot-parachain-primitives = { workspace = true, default-features = true }
 
 cumulus-primitives-core = { workspace = true }
 cumulus-pallet-xcm = { workspace = true }
 parachain-info = { workspace = true }
+
+pallet-message-queue = { workspace = true, default-features = true }
+sp-tracing = { workspace = true, default-features = true }
 
 
 sp-runtime = { workspace = true }
@@ -47,6 +58,9 @@ sp-io = { workspace = true, default-features = true }
 
 pallet-balances = { workspace = true, default-features = true }
 
+
+
+
 [features]
 default = [ "std" ]
 runtime-benchmarks = [
@@ -54,6 +68,15 @@ runtime-benchmarks = [
 	"frame-support/runtime-benchmarks",
 	"frame-system/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
+	"pallet-xcm/runtime-benchmarks",
+	"polkadot-parachain-primitives/runtime-benchmarks",
+	"polkadot-runtime-parachains/runtime-benchmarks",
+	"sp-runtime/runtime-benchmarks",
+	"xcm-builder/runtime-benchmarks",
+	"xcm-executor/runtime-benchmarks",
+	"pallet-balances/runtime-benchmarks",
+	"pallet-message-queue/runtime-benchmarks",
+	"pallet-nfts/runtime-benchmarks",
 ]
 std = [
 	"codec/std",

@@ -12329,17 +12329,27 @@ dependencies = [
  "frame-benchmarking",
  "frame-support",
  "frame-system",
+ "log",
  "pallet-balances",
+ "pallet-message-queue",
  "pallet-nfts",
+ "pallet-xcm",
  "parity-scale-codec",
+ "polkadot-core-primitives",
+ "polkadot-parachain-primitives",
+ "polkadot-runtime-parachains",
  "scale-info",
  "serde",
  "sp-core 28.0.0",
  "sp-io 30.0.0",
  "sp-runtime 31.0.1",
  "sp-std 14.0.0",
+ "sp-tracing 16.0.0",
  "staging-parachain-info",
  "staging-xcm",
+ "staging-xcm-builder",
+ "staging-xcm-executor",
+ "xcm-simulator",
 ]
 
 [[package]]
@@ -12363,6 +12373,7 @@ dependencies = [
  "sp-std 14.0.0",
  "staging-parachain-info",
  "staging-xcm",
+ "staging-xcm-builder",
 ]
 
 [[package]]
