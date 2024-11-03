@@ -921,7 +921,9 @@ pub mod pallet {
 				// storage and emit event.
 				if unwrapped_proposal.number_of_votes.aye.len() < number_of_votes / 2 ||
 					unwrapped_proposal.number_of_votes.aye.len() == 0 &&
-						unwrapped_proposal.number_of_votes.nay.len() == 0 || unwrapped_proposal.number_of_votes.aye.len() == 0 && unwrapped_proposal.number_of_votes.nay.len() == 1
+						unwrapped_proposal.number_of_votes.nay.len() == 0 ||
+					unwrapped_proposal.number_of_votes.aye.len() == 0 &&
+						unwrapped_proposal.number_of_votes.nay.len() == 1
 				{
 					CrossChainProposals::<T, I>::remove(proposal_id);
 
@@ -1040,7 +1042,9 @@ pub mod pallet {
 
 			if proposal.number_of_votes.aye.len() < number_of_votes / 2 ||
 				proposal.number_of_votes.aye.len() == 0 &&
-				proposal.number_of_votes.nay.len() == 0 || proposal.number_of_votes.aye.len() == 0 && proposal.number_of_votes.nay.len() == 1
+					proposal.number_of_votes.nay.len() == 0 ||
+				proposal.number_of_votes.aye.len() == 0 &&
+					proposal.number_of_votes.nay.len() == 1
 			{
 				Self::deposit_event(Event::ProposalDidNotPass { proposal_id });
 

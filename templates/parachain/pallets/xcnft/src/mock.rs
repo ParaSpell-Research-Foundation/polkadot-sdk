@@ -1,20 +1,14 @@
-use frame_support::weights::constants::RocksDbWeight;
-use frame_system::{mocking::MockBlock, GenesisConfig};
-use sp_runtime::{traits::ConstU64, BuildStorage};
-use frame_support::parameter_types;
+use frame_support::{parameter_types, traits::VariantCountOf, weights::constants::RocksDbWeight};
+use frame_system::{mocking::MockBlock, EnsureRoot, EnsureSigned, GenesisConfig};
 use pallet_balances::AccountData;
-use xcm_builder::WithUniqueTopic;
-use sp_runtime::MultiSignature;
-use sp_runtime::traits::Verify;
-use frame_system::EnsureRoot;
-use frame_system::EnsureSigned;
 use sp_core::ConstU32;
-use frame_support::traits::VariantCountOf;
-use sp_runtime::AccountId32 as AccountId;
+use sp_runtime::{
+	traits::{ConstU64, Verify},
+	AccountId32 as AccountId, BuildStorage, MultiSignature,
+};
+use xcm_builder::WithUniqueTopic;
 
-pub type XcmRouter = WithUniqueTopic<(
-    (),
-)>;
+pub type XcmRouter = WithUniqueTopic<((),)>;
 
 // Configure a mock runtime to test the pallet.
 #[frame_support::runtime]
@@ -39,14 +33,14 @@ mod test_runtime {
 	#[runtime::pallet_index(1)]
 	pub type XcNFT = crate;
 
-    #[runtime::pallet_index(2)]
-    pub type Balances = pallet_balances;
+	#[runtime::pallet_index(2)]
+	pub type Balances = pallet_balances;
 
 	#[runtime::pallet_index(3)]
 	pub type NFTs = pallet_nfts;
 
-    #[runtime::pallet_index(4)]
-    pub type ParachainInfo = parachain_info;
+	#[runtime::pallet_index(4)]
+	pub type ParachainInfo = parachain_info;
 }
 
 /// Balance of an account.
@@ -88,7 +82,7 @@ impl frame_system::Config for Test {
 impl parachain_info::Config for Test {}
 
 impl crate::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
+	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type XcmSender = XcmRouter;
 	type RuntimeCall = RuntimeCall;
@@ -119,10 +113,10 @@ impl pallet_balances::Config for Test {
 
 parameter_types! {
 	pub const SS58Prefix: u16 = 42;
-    pub const ExistentialDeposit: u128 = 500;
+	pub const ExistentialDeposit: u128 = 500;
 	pub const CollectionDeposit: Balance = 0 * UNIT; // 1 UNIT deposit to create asset collection
 	pub const ItemDeposit: Balance = 0 * UNIT; // 1/100 UNIT deposit to create asset item
-	pub const KeyLimit: u32 = 32;	
+	pub const KeyLimit: u32 = 32;
 	pub const ValueLimit: u32 = 64;
 	pub const UniquesMetadataDepositBase: Balance = 0 * UNIT;
 	pub const AttributeDepositBase: Balance = 0 * UNIT;
