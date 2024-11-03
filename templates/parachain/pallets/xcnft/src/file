@@ -1,3 +1,12 @@
+
+
+
+
+
+
+
+
+
 use crate::{
 	mock::*, Error, Event, GeneralizedDestroyWitness, Proposal, ReceivedAssets,
 	ReceivedCollections, ReceivedCols, ReceivedStruct, SentAssets, SentStruct,
@@ -8,10 +17,7 @@ pub mod testrelay;
 
 use frame_support::assert_noop;
 use pallet_nfts::{CollectionConfigFor, CollectionSettings, Event::Destroyed, MintSettings};
-use sp_runtime::{AccountId32, BoundedVec, BuildStorage};
-use cumulus_primitives_core::Parachain;
-use xcm_executor::traits::ConvertLocation;
-use xcm::prelude::*;
+use sp_runtime::{AccountId32, BoundedVec};
 
 pub const ALICE: AccountId32 = AccountId32::new([0u8; 32]);
 pub const BOB: AccountId32 = AccountId32::new([1u8; 32]);
@@ -112,6 +118,25 @@ pub fn relay_ext() -> sp_io::TestExternalities {
 		System::set_block_number(1);
 	});
 	ext
+}
+
+#[test]
+fn try_sending_collection_that_doesnt_exist() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		const COLLECTION_ID: u32 = 1;
+
+		assert_noop!(
+			XcNFT::collection_x_transfer(
+				RuntimeOrigin::signed(ALICE),
+				COLLECTION_ID,
+				Some(COLLECTION_ID),
+				2000.into(),
+				None
+			),
+			Error::<Test>::CollectionDoesNotExist
+		);
+	});
 }
 
 #[test]
