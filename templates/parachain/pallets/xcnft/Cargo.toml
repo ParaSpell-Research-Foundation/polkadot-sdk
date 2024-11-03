@@ -74,6 +74,7 @@ std = [
 	"sp-runtime/std",
 	"sp-std/std",
 	"xcm/std",
+	"xcm-builder/std",
 	"sp-core/std",
 	"sp-io/std",
 	"sp-runtime/std",
