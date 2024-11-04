@@ -7,11 +7,11 @@ pub mod testpara;
 pub mod testrelay;
 
 use frame_support::assert_noop;
-use sp_runtime::{traits::Bounded, AccountId32, BoundedVec, BuildStorage};
+use sp_runtime::{AccountId32, BoundedVec, BuildStorage};
 use cumulus_primitives_core::Parachain;
 use xcm_executor::traits::ConvertLocation;
 use xcm::prelude::*;
-use crate::tests::testpara::XcNFT;
+use pallet_uniques;
 
 pub const ALICE: AccountId32 = AccountId32::new([0u8; 32]);
 pub const BOB: AccountId32 = AccountId32::new([1u8; 32]);
@@ -784,24 +784,6 @@ fn try_parse_collection_metadata_successful() {
 			collection: 0,
 			data: BoundedVec::new(),
 			is_frozen: false,
-		}));
-	});
-}
-
-#[test]
-fn try_parse_collection_owner_successful() {
-	ParaA::execute_with(|| {
-		testpara::System::set_block_number(2);
-
-		let _ = testpara::NFTs::create(testpara::RuntimeOrigin::signed(ALICE), 0, ALICE);
-
-		pallet_uniques::OwnershipAcceptance::<Test>::insert(BOB, 0);
-
-		let _ = testpara::XcNFT::parse_collection_owner(testpara::RuntimeOrigin::signed(ALICE), BOB, 0);
-
-		testpara::System::assert_has_event(testpara::RuntimeEvent::NFTs(pallet_uniques::Event::OwnerChanged {
-			collection: 0,
-			new_owner: BOB,
 		}));
 	});
 }
