@@ -13296,7 +13296,7 @@ dependencies = [
  "futures",
  "jsonrpsee 0.24.3",
  "log",
- "parachain-template-runtime",
+ "parachain-template-runtime-two",
  "parity-scale-codec",
  "polkadot-sdk",
  "sc-tracing",
