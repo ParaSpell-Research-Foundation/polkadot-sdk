@@ -26,6 +26,7 @@ use crate::tests::testrelay::{RuntimeCall, XcmPallet};
 use frame_support::traits::{Everything, Nothing};
 use xcm_builder::{EnsureDecodableXcm, FixedRateOfFungible, FrameTransactionalProcessor};
 use xcm_executor::Config;
+use xcm_executor::traits::WithOriginFilter;
 
 // Generated from `decl_test_network!`
 pub type XcmRouter = EnsureDecodableXcm<crate::tests::RelayChainXcmRouter>;
@@ -53,9 +54,9 @@ impl Config for XcmConfig {
 	type MaxAssetsIntoHolding = constants::MaxAssetsIntoHolding;
 	type MessageExporter = ();
 	type UniversalAliases = Nothing;
-	type CallDispatcher = RuntimeCall;
+	type CallDispatcher = WithOriginFilter<Self::SafeCallFilter>;
 	type SafeCallFilter = Everything;
-	type Aliasers = Nothing;
+	type Aliasers = Everything;
 	type TransactionalProcessor = FrameTransactionalProcessor;
 	type HrmpNewChannelOpenRequestHandler = ();
 	type HrmpChannelAcceptedHandler = ();

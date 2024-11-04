@@ -15,6 +15,6 @@
 // along with Polkadot.  If not, see <http://www.gnu.org/licenses/>.
 
 use frame_support::traits::Everything;
-use xcm_builder::AllowUnpaidExecutionFrom;
+use xcm_builder::AllowExplicitUnpaidExecutionFrom;
 
-pub type Barrier = AllowUnpaidExecutionFrom<Everything>;
+pub type Barrier = AllowExplicitUnpaidExecutionFrom<Everything>;
