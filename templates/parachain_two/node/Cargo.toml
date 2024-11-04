@@ -23,7 +23,7 @@ color-print = { workspace = true }
 
 polkadot-sdk = { workspace = true, features = ["node"] }
 
-parachain-template-runtime = { workspace = true }
+parachain-template-runtime-two = { workspace = true }
 
 # Substrate
 sc-tracing = { workspace = true, default-features = true }
