@@ -87,6 +87,8 @@ runtime-benchmarks = [
 	"pallet-parachain-template/runtime-benchmarks",
 	"polkadot-sdk/runtime-benchmarks",
 	"pallet-parachain-xcnft/runtime-benchmarks",
+	"pallet-parachain-template/runtime-benchmarks",
+	"pallet-nfts/runtime-benchmarks",
 ]
 
 try-runtime = [
@@ -94,17 +96,5 @@ try-runtime = [
 	"pallet-parachain-template/try-runtime",
 	"polkadot-sdk/try-runtime",
 	"pallet-parachain-xcnft/try-runtime",
+	"pallet-nfts/try-runtime",
 ]
-
-# Enable the metadata hash generation.
-#
-# This is hidden behind a feature because it increases the compile time.
-# The wasm binary needs to be compiled twice, once to fetch the metadata,
-# generate the metadata hash and then a second time with the
-# `RUNTIME_METADATA_HASH` environment variable set for the `CheckMetadataHash`
-# extension.
-metadata-hash = ["substrate-wasm-builder/metadata-hash"]
-
-# A convenience feature for enabling things when doing a build
-# for an on-chain release.
-on-chain-release-build = ["metadata-hash"]

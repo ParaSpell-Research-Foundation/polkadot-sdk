@@ -12326,6 +12326,7 @@ version = "0.1.0"
 dependencies = [
  "cumulus-pallet-xcm",
  "cumulus-primitives-core",
+ "enumflags2",
  "frame-benchmarking",
  "frame-support",
  "frame-system",

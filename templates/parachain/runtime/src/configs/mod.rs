@@ -374,5 +374,7 @@ impl pallet_nfts::Config for Runtime {
 	type Features = NftFeatures;
 	type OffchainSignature = MultiSignature;
 	type OffchainPublic = AccountPublic;
+	#[cfg(feature = "runtime-benchmarks")]
+	type Helper = ();
 	type WeightInfo = ();
 }

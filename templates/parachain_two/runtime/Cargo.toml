@@ -87,6 +87,8 @@ runtime-benchmarks = [
 	"pallet-parachain-template-two/runtime-benchmarks",
 	"polkadot-sdk/runtime-benchmarks",
 	"pallet-parachain-xcnft-two/runtime-benchmarks",
+	"pallet-parachain-template-two/runtime-benchmarks",
+	"pallet-uniques/runtime-benchmarks",
 ]
 
 try-runtime = [
