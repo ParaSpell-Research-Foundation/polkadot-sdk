@@ -639,7 +639,6 @@ pub mod pallet {
 						),
 						Transact {
 							origin_kind: OriginKind::SovereignAccount,
-							require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
 							call: <T as Config<I>>::RuntimeCall::from(
 								Call::<T, I>::parse_collection_empty {
 									origin_collection: origin_collection.clone(),
@@ -812,7 +811,6 @@ pub mod pallet {
 						),
 						Transact {
 							origin_kind: OriginKind::SovereignAccount,
-							require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
 							call: <T as Config<I>>::RuntimeCall::from(
 								Call::<T, I>::parse_collection_same_owner {
 									origin_collection_id: origin_collection.clone(),
@@ -1137,7 +1135,6 @@ pub mod pallet {
 						),
 						Transact {
 							origin_kind: OriginKind::SovereignAccount,
-							require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
 							call: <T as Config<I>>::RuntimeCall::from(
 								Call::<T, I>::parse_collection_diff_owners {
 									config,
@@ -1296,7 +1293,6 @@ pub mod pallet {
 					),
 					Transact {
 						origin_kind: OriginKind::SovereignAccount,
-						require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
 						call: <T as Config<I>>::RuntimeCall::from(
 							Call::<T, I>::parse_nft_transfer {
 								origin_collection: origin_collection.clone(),
@@ -1568,7 +1564,6 @@ pub mod pallet {
 					),
 					Transact {
 						origin_kind: OriginKind::Native,
-						require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
 						call: <T as Config<I>>::RuntimeCall::from(
 							Call::<T, I>::parse_collection_metadata {
 								collection: destination_collection_id.clone(),
@@ -1640,7 +1635,6 @@ pub mod pallet {
 					),
 					Transact {
 						origin_kind: OriginKind::SovereignAccount,
-						require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
 						call: <T as Config<I>>::RuntimeCall::from(
 							Call::<T, I>::parse_nft_metadata {
 								collection: destination_collection_id.clone(),
@@ -1714,7 +1708,6 @@ pub mod pallet {
 					),
 					Transact {
 						origin_kind: OriginKind::SovereignAccount,
-						require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
 						call: <T as Config<I>>::RuntimeCall::from(Call::parse_collection_burn {
 							collection_to_burn: destination_collection_id.clone(),
 							witness_data: witnes_data.clone(),
@@ -1783,7 +1776,6 @@ pub mod pallet {
 					),
 					Transact {
 						origin_kind: OriginKind::SovereignAccount,
-						require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
 						call: <T as Config<I>>::RuntimeCall::from(Call::<T, I>::parse_nft_burn {
 							collection: destination_collection_id.clone(),
 							item: destination_asset_id.clone(),
@@ -1854,7 +1846,6 @@ pub mod pallet {
 					),
 					Transact {
 						origin_kind: OriginKind::SovereignAccount,
-						require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
 						call: <T as Config<I>>::RuntimeCall::from(
 							Call::<T, I>::parse_collection_owner {
 								new_owner: destination_account.clone(),
@@ -1925,7 +1916,6 @@ pub mod pallet {
 					),
 					Transact {
 						origin_kind: OriginKind::SovereignAccount,
-						require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
 						call: <T as Config<I>>::RuntimeCall::from(Call::<T, I>::parse_nft_owner {
 							new_owner: destination_account.clone(),
 							collection: destination_collection_id.clone(),
