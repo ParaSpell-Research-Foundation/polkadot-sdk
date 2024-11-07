@@ -114,7 +114,7 @@ pub mod pallet {
 
 		/// A type representing the weights required by the dispatchables of this pallet.
 		type WeightInfo: crate::weights::WeightInfo;
-		
+
 		/// Specifies how long should cross-chain proposals last
 		type ProposalTimeInBlocks: Get<u32>;
 
