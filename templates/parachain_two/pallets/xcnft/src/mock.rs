@@ -83,7 +83,7 @@ impl parachain_info::Config for Test {}
 
 impl crate::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = ();
+	type WeightInfo = crate::weights::SubstrateWeight<Test>;
 	type XcmSender = XcmRouter;
 	type RuntimeCall = RuntimeCall;
 	type ProposalTimeInBlocks = proposal_time_in_blocks_parameter;

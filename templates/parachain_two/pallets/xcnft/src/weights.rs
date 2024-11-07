@@ -4,7 +4,7 @@
 //! THIS FILE WAS AUTO-GENERATED USING THE SUBSTRATE BENCHMARK CLI VERSION 32.0.0
 //! DATE: 2024-11-06, STEPS: `50`, REPEAT: `20`, LOW RANGE: `[]`, HIGH RANGE: `[]`
 //! WORST CASE MAP SIZE: `1000000`
-//! HOSTNAME: `MacBook-Pro-uzivatela-Dudo.local`, CPU: `<UNKNOWN>`
+//! HOSTNAME: `MacBook-Pro`, CPU: `ArmM1`
 //! WASM-EXECUTION: `Compiled`, CHAIN: `None`, DB CACHE: 1024
 
 // Executed Command:
@@ -31,10 +31,22 @@
 
 use frame_support::{traits::Get, weights::Weight};
 use core::marker::PhantomData;
+use crate as pallet_parachain_xcnft_two;
 
 /// Weight functions for `pallet_parachain_xcnft_two`.
-pub struct WeightInfo<T>(PhantomData<T>);
-impl<T: frame_system::Config> pallet_parachain_xcnft_two::WeightInfo for WeightInfo<T> {
+pub trait WeightInfo {
+	fn transfer_collection_empty() -> Weight;
+	fn transfer_collection_same_owner() -> Weight;
+	fn transfer_collection_other_owners() -> Weight;
+	fn transfer_nft() -> Weight;
+	fn parse_empty_col() -> Weight;
+	fn parse_same_owner_col() -> Weight;
+	fn parse_diff_owner_col() -> Weight;
+	fn parse_item() -> Weight;
+}
+
+pub struct SubstrateWeight<T>(PhantomData<T>);
+impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Storage: `UniquesModule::Class` (r:1 w:0)
 	/// Proof: `UniquesModule::Class` (`max_values`: None, `max_size`: Some(178), added: 2653, mode: `MaxEncodedLen`)
 	/// Storage: `UniquesModule::Asset` (r:1 w:0)

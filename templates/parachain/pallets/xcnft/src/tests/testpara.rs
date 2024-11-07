@@ -193,7 +193,7 @@ impl pallet_xcm::Config for Runtime {
 
 impl crate::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = ();
+	type WeightInfo = crate::weights::SubstrateWeight<Runtime>;
 	type XcmSender = XcmRouter;
 	type RuntimeCall = RuntimeCall;
 	type ProposalTimeInBlocks = proposal_time_in_blocks_parameter;
